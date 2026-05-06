@@ -2,24 +2,126 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Вход — Информатика СПО</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Личный кабинет — Информатика СПО</title>
     <link rel="stylesheet" href="css/style.css">
-    <link rel="preload" href="data/students.js" as="script">
+    <style>
+        iframe{width:100%;height:calc(100vh - 140px);border:none;border-radius:8px}
+        .task-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px;margin-top:16px}
+        .task-card{border:1px solid #e2e8f0;border-radius:12px;padding:16px;background:white;cursor:pointer;transition:.2s}
+        .task-card:hover{box-shadow:0 4px 12px rgba(0,0,0,.1)}
+        .task-card h4{margin-bottom:4px}
+        .task-card .score{font-size:1.5em;font-weight:700;color:#2563eb}
+    </style>
 </head>
-<body class="auth-screen">
-    <div class="auth-box">
-        <h2>🔐 Вход в систему</h2>
-        <p class="subtitle">Интерактивная платформа по информатике</p>
-        <input type="text" id="loginInput" class="form-control" placeholder="Логин (фамилия латиницей)" autocomplete="off" autofocus>
-        <input type="password" id="passwordInput" class="form-control" placeholder="Пароль">
-        <p class="error-msg" id="errorMsg"></p>
-        <button class="btn btn-primary btn-block" onclick="login()" style="padding:14px;font-size:1em;">Войти</button>
-        <p class="text-muted text-center mt-2" style="font-size:.8em">
-            <b>📌 Пример:</b> логин: <b>ivanov</b> / пароль: <b>101001</b>
-        </p>
+<body>
+    <header class="header">
+        <h1>📚 Информатика — СПО 1 курс</h1>
+        <div class="user-block">
+            <span id="userName">Загрузка...</span>
+            <button class="btn btn-outline btn-sm" onclick="logout()">🚪 Выйти</button>
+        </div>
+    </header>
+
+    <div class="container">
+        <nav class="sidebar">
+            <h3>📋 Навигация</h3>
+            <ul class="nav-list">
+                <li><a href="#" onclick="showProgress()" id="navProgress" class="active">📊 Мой прогресс</a></li>
+                <li class="section-title">Цифровая грамотность</li>
+                <li><a href="#" onclick="openTask('pz1')">💻 ПЗ №1 — Аппаратное обеспечение</a></li>
+                <li><a href="#" onclick="openTask('pz2')">📁 ПЗ №2 — Файлы и папки</a></li>
+                <li><a href="#" onclick="openTask('pz3')">🌐 ПЗ №3 — Локальная сеть</a></li>
+                <li><a href="#" onclick="openTask('pz5')">🌍 ПЗ №5 — Интернет-сервисы</a></li>
+                <li><a href="#" onclick="openTask('pz6')">🛡️ ПЗ №6 — Антивирус</a></li>
+                <li><a href="#" onclick="openTask('pz7')">🗜️ ПЗ №7 — Архивация</a></li>
+                <li class="section-title">Теория информатики</li>
+                <li><a href="#" onclick="openTask('pz8')">🖼️ ПЗ №8 — Дискретизация</a></li>
+            </ul>
+        </nav>
+
+        <main class="main-content" id="mainContent">
+            <p class="text-muted">Загрузка...</p>
+        </main>
     </div>
-    <script src="data/students.js"></script>
+
     <script src="js/auth.js"></script>
+    <script>
+        // Проверка входа
+        var user = checkAuth();
+        if (!user) {
+            window.location.href = 'index.html';
+        }
+        
+        document.getElementById('userName').textContent = user.name + ' (гр. ' + user.group + ')';
+        
+        // Задания
+        var TASKS = {
+            pz1:{name:'ПЗ №1 — Аппаратное обеспечение',max:16},
+            pz2:{name:'ПЗ №2 — Файлы и папки',max:15},
+            pz3:{name:'ПЗ №3 — Локальная сеть',max:24},
+            pz5:{name:'ПЗ №5 — Интернет-сервисы',max:5},
+            pz6:{name:'ПЗ №6 — Антивирус',max:5},
+            pz7:{name:'ПЗ №7 — Архивация',max:16},
+            pz8:{name:'ПЗ №8 — Дискретизация',max:20}
+        };
+        
+        // Показать прогресс
+        function showProgress(){
+            document.querySelectorAll('.nav-list a').forEach(function(a){a.classList.remove('active')});
+            document.getElementById('navProgress').classList.add('active');
+            
+            var h = '<h2>📊 Мой прогресс</h2>';
+            h += '<p class="text-muted mb-2">Студент: <b>' + user.name + '</b> | Группа: <b>' + user.group + '</b></p>';
+            h += '<div class="task-grid">';
+            
+            for(var id in TASKS){
+                var t = TASKS[id];
+                var r = getTaskResult(user.login, id);
+                var score = r ? r.score : null;
+                var pct = r ? r.percent : 0;
+                var color = pct >= 80 ? 'bg-green' : pct >= 50 ? 'bg-yellow' : '';
+                var status = score === null ? 'Не выполнено' : pct >= 80 ? '✅ Отлично' : pct >= 50 ? '⚠️ Частично' : '❌ Низкий балл';
+                
+                h += '<div class="task-card" onclick="openTask(\''+id+'\')">';
+                h += '<h4>'+t.name+'</h4>';
+                h += '<div class="score">'+(score !== null ? score : '—')+'<small style="font-size:.5em;color:#94a3b8">/'+t.max+'</small></div>';
+                if(score !== null){
+                    h += '<div class="progress-bar mt-1"><div class="progress-fill '+color+'" style="width:'+pct+'%"></div></div>';
+                }
+                h += '<p style="font-size:.8em;color:#64748b;margin-top:4px">'+status+'</p>';
+                h += '</div>';
+            }
+            h += '</div>';
+            
+            document.getElementById('mainContent').innerHTML = h;
+        }
+        
+        // Открыть задание
+        function openTask(tid){
+            document.querySelectorAll('.nav-list a').forEach(function(a){a.classList.remove('active')});
+            document.getElementById('mainContent').innerHTML = 
+                '<h2>📝 ' + TASKS[tid].name + '</h2>' +
+                '<p class="text-muted mb-2">Максимум: ' + TASKS[tid].max + ' баллов</p>' +
+                '<iframe src="pz/' + tid + '.html?user=' + user.login + '&name=' + encodeURIComponent(user.name) + '&group=' + user.group + '"></iframe>';
+        }
+        
+        // Сохранить результат из задания
+        window.addEventListener('message', function(e){
+            if(e.data.type === 'saveResult'){
+                saveTaskResult(user.login, e.data.taskId, e.data.score, e.data.maxScore);
+                showProgress();
+            }
+        });
+        
+        // Загружаем прогресс при открытии
+        showProgress();
+        
+        // Обработка выхода
+        function logout(){
+            sessionStorage.removeItem('currentUser');
+            window.location.href = 'index.html';
+        }
+    </script>
 </body>
 </html>
