@@ -2,21 +2,22 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#1e293b">
+    <meta name="apple-mobile-web-app-capable" content="yes">
     <title>Вход — Информатика СПО</title>
     <link rel="stylesheet" href="css/style.css">
-    <link rel="preload" href="data/students.js" as="script">
 </head>
 <body class="auth-screen">
     <div class="auth-box">
         <h2>🔐 Вход в систему</h2>
         <p class="subtitle">Интерактивная платформа по информатике</p>
-        <input type="text" id="loginInput" class="form-control" placeholder="Логин (фамилия латиницей)" autocomplete="off" autofocus>
+        <input type="text" id="loginInput" class="form-control" placeholder="Логин (фамилия)" autocomplete="off" autofocus>
         <input type="password" id="passwordInput" class="form-control" placeholder="Пароль">
         <p class="error-msg" id="errorMsg"></p>
         <button class="btn btn-primary btn-block" onclick="login()" style="padding:14px;font-size:1em;">Войти</button>
-        <p class="text-muted text-center mt-2" style="font-size:.8em">
-            <b>📌 Пример:</b> логин: <b>ivanov</b> / пароль: <b>101001</b>
+        <p class="text-muted text-center mt-2" style="font-size:0.75em;">
+            📌 <b>ivanov</b> / <b>101001</b> | Админ: <b>admin</b> / <b>admin2024</b>
         </p>
     </div>
     <script src="data/students.js"></script>
