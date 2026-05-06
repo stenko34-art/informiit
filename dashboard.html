@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Личный кабинет — Информатика СПО</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="preload" href="js/auth.js" as="script">
+</head>
+<body>
+    <header class="header">
+        <h1>📚 Информатика — СПО 1 курс</h1>
+        <div class="user-block">
+            <span id="userName">Загрузка...</span>
+            <button class="btn btn-outline btn-sm" onclick="logout()">🚪 Выйти</button>
+        </div>
+    </header>
+    <div class="container">
+        <nav class="sidebar">
+            <h3>📋 Навигация</h3>
+            <ul class="nav-list">
+                <li><a href="#" onclick="showProgress()" id="navProgress" class="active">📊 Мой прогресс</a></li>
+                <li class="section-title">Цифровая грамотность</li>
+                <li><a href="#" onclick="openTask('pz1')" id="navPZ1">💻 ПЗ №1 — Аппаратное обеспечение</a></li>
+                <li><a href="#" onclick="openTask('pz2')" id="navPZ2">📁 ПЗ №2 — Файлы и папки</a></li>
+                <li><a href="#" onclick="openTask('pz3')" id="navPZ3">🌐 ПЗ №3 — Локальная сеть</a></li>
+                <li><a href="#" onclick="openTask('pz5')" id="navPZ5">🌍 ПЗ №5 — Интернет-сервисы</a></li>
+                <li><a href="#" onclick="openTask('pz6')" id="navPZ6">🛡️ ПЗ №6 — Антивирус</a></li>
+                <li><a href="#" onclick="openTask('pz7')" id="navPZ7">🗜️ ПЗ №7 — Архивация</a></li>
+                <li class="section-title">Теория информатики</li>
+                <li><a href="#" onclick="openTask('pz8')" id="navPZ8">🖼️ ПЗ №8 — Дискретизация</a></li>
+            </ul>
+        </nav>
+        <main class="main-content" id="mainContent">
+            <p class="text-muted">Загрузка...</p>
+        </main>
+    </div>
+    <script src="js/auth.js"></script>
+    <script>
+        const user = checkAuth();
+        if (user) {
+            document.getElementById('userName').textContent = user.name + ' (гр. ' + user.group + ')';
+            showProgress();
+        }
+        
+        function showProgress() {
+            setActive('navProgress');
+            const tasks = {pz1:{n:'ПЗ №1 — Аппаратное обеспечение',m:16},pz2:{n:'ПЗ №2 — Файлы и папки',m:15},pz3:{n:'ПЗ №3 — Локальная сеть',m:24},pz5:{n:'ПЗ №5 — Интернет-сервисы',m:5},pz6:{n:'ПЗ №6 — Антивирус',m:5},pz7:{n:'ПЗ №7 — Архивация',m:16},pz8:{n:'ПЗ №8 — Дискретизация',m:20}};
+            let h = '<h2>📊 Мой прогресс</h2><p class="text-muted mb-2">Студент: <b>'+user.name+'</b> | Группа: <b>'+user.group+'</b></p><table><tr><th>Задание</th><th>Баллы</th><th>Макс.</th><th>Прогресс</th><th>Статус</th><th></th></tr>';
+            for(let[id,t]of Object.entries(tasks)){
+                let r=getTaskResult(user.login,id),s=r?.score??null,p=r?.percent??0,c=p>=80?'bg-green':p>=50?'bg-yellow':p?'bg-red':'';
+                let st=s===null?'<span class="badge badge-secondary">Не выполнено</span>':p>=80?'<span class="badge badge-success">✅ Отлично</span>':p>=50?'<span class="badge badge-warning">⚠️ Частично</span>':'<span class="badge badge-danger">❌ Низкий</span>';
+                h+='<tr><td style="text-align:left">'+t.n+'</td><td>'+(s??'—')+'</td><td>'+t.m+'</td><td><div class="progress-bar"><div class="progress-fill '+c+'" style="width:'+p+'%"></div></div></td><td>'+st+'</td><td><button class="btn btn-primary btn-sm" onclick="openTask(\''+id+'\')">▶</button></td></tr>';
+            }
+            h+='</table>';
+            document.getElementById('mainContent').innerHTML = h;
+        }
+        
+        function openTask(tid){
+            setActive('nav'+tid.toUpperCase());
+            document.getElementById('mainContent').innerHTML='<div style="height:calc(100vh - 160px)"><iframe src="pz/'+tid+'.html?user='+user.login+'&name='+encodeURIComponent(user.name)+'&group='+user.group+'" style="width:100%;height:100%;border:none;border-radius:8px" loading="lazy"></iframe></div>';
+        }
+        
+        function setActive(id){
+            document.querySelectorAll('.nav-list a').forEach(a=>a.classList.remove('active'));
+            let el=document.getElementById(id);if(el)el.classList.add('active');
+        }
+        
+        window.addEventListener('message',function(e){
+            if(e.data.type==='saveResult'){
+                saveTaskResult(user.login,e.data.taskId,e.data.score,e.data.maxScore);
+                showProgress();
+            }
+        });
+    </script>
+</body>
+</html>
