@@ -3,8 +3,6 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="theme-color" content="#1e293b">
-    <meta name="apple-mobile-web-app-capable" content="yes">
     <title>Вход — Информатика СПО</title>
     <link rel="stylesheet" href="css/style.css">
 </head>
@@ -12,15 +10,106 @@
     <div class="auth-box">
         <h2>🔐 Вход в систему</h2>
         <p class="subtitle">Интерактивная платформа по информатике</p>
-        <input type="text" id="loginInput" class="form-control" placeholder="Логин (фамилия)" autocomplete="off" autofocus>
-        <input type="password" id="passwordInput" class="form-control" placeholder="Пароль">
+        <input type="text" id="loginInput" class="form-control" placeholder="Логин (например: ivanov)" autocomplete="off" autofocus>
+        <input type="password" id="passwordInput" class="form-control" placeholder="Пароль (например: 101001)">
         <p class="error-msg" id="errorMsg"></p>
-        <button class="btn btn-primary btn-block" onclick="login()" style="padding:14px;font-size:1em;">Войти</button>
+        <button class="btn btn-primary btn-block" onclick="doLogin()" style="padding:14px;font-size:1em;">Войти</button>
         <p class="text-muted text-center mt-2" style="font-size:0.75em;">
             📌 <b>ivanov</b> / <b>101001</b> | Админ: <b>admin</b> / <b>admin2024</b>
         </p>
     </div>
-    <script src="data/students.js"></script>
-    <script src="js/auth.js"></script>
+
+    <script>
+    // База студентов
+    var STUDENTS = {
+        'ivanov':   { password: '101001', name: 'Иванов Иван Иванович',    group: '101' },
+        'petrov':   { password: '101002', name: 'Петров Пётр Петрович',    group: '101' },
+        'sidorov':  { password: '101003', name: 'Сидоров Алексей Сергеевич', group: '101' },
+        'smirnov':  { password: '101004', name: 'Смирнов Дмитрий Андреевич', group: '101' },
+        'popov':    { password: '102001', name: 'Попов Александр Викторович', group: '102' },
+        'sokolov':  { password: '102002', name: 'Соколов Денис Игоревич',    group: '102' },
+        'admin':    { password: 'admin2024', name: 'Преподаватель', group: 'admin', isAdmin: true }
+    };
+
+    // Хранилище результатов
+    var resultsData = {};
+    try {
+        var saved = localStorage.getItem('itResults');
+        if (saved) resultsData = JSON.parse(saved);
+    } catch(e) {}
+
+    function saveResults() {
+        localStorage.setItem('itResults', JSON.stringify(resultsData));
+    }
+
+    // Функция входа
+    function doLogin() {
+        console.log('Кнопка нажата!'); // Для отладки
+        
+        var loginInput = document.getElementById('loginInput');
+        var passwordInput = document.getElementById('passwordInput');
+        var errorMsg = document.getElementById('errorMsg');
+        
+        var login = loginInput.value.trim().toLowerCase();
+        var password = passwordInput.value.trim();
+        
+        errorMsg.style.display = 'none';
+        
+        if (!login || !password) {
+            errorMsg.textContent = 'Введите логин и пароль';
+            errorMsg.style.display = 'block';
+            return;
+        }
+        
+        console.log('Логин:', login); // Для отладки
+        
+        var user = STUDENTS[login];
+        
+        if (!user) {
+            errorMsg.textContent = 'Студент с таким логином не найден';
+            errorMsg.style.display = 'block';
+            return;
+        }
+        
+        if (user.password !== password) {
+            errorMsg.textContent = 'Неверный пароль';
+            errorMsg.style.display = 'block';
+            return;
+        }
+        
+        console.log('Вход успешен!'); // Для отладки
+        
+        var currentUser = { 
+            login: login, 
+            name: user.name, 
+            group: user.group, 
+            isAdmin: user.isAdmin 
+        };
+        
+        if (!resultsData[login]) {
+            resultsData[login] = { tasks: {}, lastLogin: new Date().toISOString() };
+        }
+        saveResults();
+        
+        sessionStorage.setItem('currentUser', JSON.stringify(currentUser));
+        
+        if (user.isAdmin) {
+            window.location.href = 'admin.html';
+        } else {
+            window.location.href = 'dashboard.html';
+        }
+    }
+
+    // Вход по Enter
+    document.getElementById('passwordInput').addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+            console.log('Enter нажат!');
+            doLogin();
+        }
+    });
+
+    // Проверка загрузки
+    console.log('Страница загружена, функция doLogin готова');
+    </script>
 </body>
 </html>
