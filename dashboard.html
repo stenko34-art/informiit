@@ -233,14 +233,52 @@
         }
 
         function renderCard(id, task) {
-            var status = task ? (task.status||'') : '';
-            var grade = task ? (task.grade||'') : '';
+            var status = task ? (task.status || '') : '';
+            var grade = task ? (task.grade || '') : '';
             var hasGrade = grade && !isNaN(parseFloat(grade)) && parseFloat(grade) > 0;
-            var isDone = hasGrade && status !== '2';
-            var isDebt = !isDone;
-            var display = isDone ? grade : 'долг';
-            var cls = isDone ? ('grade-' + (parseFloat(grade)>=5?'5':parseFloat(grade)>=4?'4':parseFloat(grade)>=3?'3':'2')) : 'grade-2';
-            var badge = isDone ? '<span class="status-badge badge-done">✔</span>' : '<span class="status-badge badge-fail">✘</span>';
+            
+            var display = 'долг';
+            var cls = 'grade-2';
+            var badge = '<span class="status-badge badge-fail">✘</span>';
+            
+            // Пересдача: 2 в статусе + оценка => среднее арифметическое с округлением вверх
+            if (status === '2' && hasGrade) {
+                var avg = (2 + parseFloat(grade)) / 2;
+                avg = Math.ceil(avg * 2) / 2; // округляем до 0.5 вверх
+                if (avg === 2) avg = 2;
+                if (avg === 2.5) avg = 3;
+                if (avg === 3) avg = 3;
+                if (avg === 3.5) avg = 4;
+                if (avg === 4) avg = 4;
+                if (avg === 4.5) avg = 5;
+                display = avg;
+                if (avg >= 5) cls = 'grade-5';
+                else if (avg >= 4) cls = 'grade-4';
+                else if (avg >= 3) cls = 'grade-3';
+                else cls = 'grade-2';
+                badge = '<span class="status-badge badge-done">✔</span>';
+            }
+            // Обычная сдача: есть оценка, нет "2"
+            else if (hasGrade && status !== '2' && status !== 'н') {
+                display = grade;
+                var g = parseFloat(grade);
+                if (g >= 5) cls = 'grade-5';
+                else if (g >= 4) cls = 'grade-4';
+                else if (g >= 3) cls = 'grade-3';
+                else cls = 'grade-2';
+                badge = '<span class="status-badge badge-done">✔</span>';
+            }
+            // "н" + оценка = сдал после пропуска
+            else if (status === 'н' && hasGrade) {
+                display = grade;
+                var g = parseFloat(grade);
+                if (g >= 5) cls = 'grade-5';
+                else if (g >= 4) cls = 'grade-4';
+                else if (g >= 3) cls = 'grade-3';
+                else cls = 'grade-2';
+                badge = '<span class="status-badge badge-done">✔</span>';
+            }
+            
             return '<div class="task-card"><h4>' + id + '</h4><div class="grade ' + cls + '">' + display + '</div>' + badge + '</div>';
         }
 
