@@ -154,56 +154,46 @@
             var cells = row.cells;
             var headers = row._headers || [];
             
-            var i = 4; // Начинаем с колонки E
+            // Сначала собираем карту заголовков: [индекс, номер работы, заголовок]
+            var headerMap = [];
+            for (var i = 4; i < headers.length - 3; i++) {
+                var text = String(headers[i] || '').trim();
+                if (!text) continue;
+                
+                // Пропускаем явно не-работы
+                if (text.includes('сред') || text.includes('проп') || 
+                    text.includes('Осталось') || text.includes('Excel') ||
+                    text.includes('Ссылка') || text.includes('Вх') ||
+                    text.includes('тест') || text.includes('П/р') ||
+                    text.includes('Номер') || text.includes('Автом') ||
+                    text.includes('Допуск')) continue;
+                
+                var match = text.match(/^(\d+)/);
+                if (match) {
+                    headerMap.push({ index: i, number: match[1], header: text });
+                }
+            }
             
-            while (i < cells.length - 3) {
-                var headerText = String(headers[i] || '').trim();
+            // Теперь для каждого заголовка определяем статус и оценку
+            for (var j = 0; j < headerMap.length; j++) {
+                var current = headerMap[j];
+                var next = headerMap[j + 1];
                 
-                // Пропускаем служебные столбцы
-                if (!headerText || 
-                    headerText.includes('Вх') || 
-                    headerText.includes('тест') || 
-                    headerText.includes('П/р') || 
-                    headerText.includes('Excel') ||
-                    headerText.includes('сред') ||
-                    headerText.includes('проп') ||
-                    headerText.includes('Осталось') ||
-                    headerText.includes('Ссылка') ||
-                    headerText.includes('Номер')) {
-                    i++;
-                    continue;
+                var taskId = (type === 'ПЗ' ? 'ПЗ ' : 'ЛР ') + current.number;
+                
+                // Если следующий заголовок сразу за текущим (индекс+1) — 
+                // значит у работы только одна ячейка (сразу оценка)
+                if (next && next.index === current.index + 1) {
+                    tasks[taskId] = { status: '', grade: getVal(cells[current.index]) };
                 }
-                
-                // Ищем номер работы в начале заголовка
-                var match = headerText.match(/^(\d+)/);
-                if (!match) {
-                    i++;
-                    continue;
+                // Если следующий заголовок через 2+ ячейки — 
+                // первая ячейка статус, вторая оценка
+                else {
+                    tasks[taskId] = {
+                        status: getVal(cells[current.index]),
+                        grade: getVal(cells[current.index + 1])
+                    };
                 }
-                
-                var number = match[1];
-                
-                // Проверяем, не является ли следующая ячейка продолжением заголовка
-                var nextHeader = String(headers[i + 1] || '').trim();
-                var nextMatch = nextHeader.match(/^(\d+)/);
-                
-                // Если следующая ячейка тоже начинается с числа — это новый заголовок
-                // Значит текущая работа имеет только одну ячейку (статус = оценка)
-                if (nextMatch && !nextHeader.includes('Excel') && !nextHeader.includes('П/р')) {
-                    var gradeVal = getVal(cells[i]);
-                    var taskId = (type === 'ПЗ' ? 'ПЗ ' : 'ЛР ') + number;
-                    tasks[taskId] = { status: '', grade: gradeVal };
-                    i++;
-                    continue;
-                }
-                
-                // Обычный случай: первая ячейка — статус, вторая — оценка
-                var statusVal = getVal(cells[i]);
-                var gradeVal = getVal(cells[i + 1]);
-                var taskId = (type === 'ПЗ' ? 'ПЗ ' : 'ЛР ') + number;
-                
-                tasks[taskId] = { status: statusVal, grade: gradeVal };
-                i += 2; // Пропускаем обе ячейки
             }
             
             return tasks;
