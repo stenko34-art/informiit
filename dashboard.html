@@ -14,7 +14,6 @@
         .status-badge{display:inline-block;padding:2px 6px;border-radius:8px;font-size:.65em;font-weight:600}
         .badge-done{background:#ecfdf5;color:#065f46}
         .badge-fail{background:#fef2f2;color:#991b1b}
-        .badge-pending{background:#f1f5f9;color:#475569}
         .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin:12px 0}
         .stat-card{background:linear-gradient(135deg,#f8fafc,#fff);border:1px solid #e2e8f0;border-radius:10px;padding:12px;text-align:center}
         .stat-card .val{font-size:1.8em;font-weight:700}
@@ -42,7 +41,6 @@
     </div>
 
     <script src="js/auth.js"></script>
-    <script src="js/google-sheets.js"></script>
     <script>
         var user = checkAuth();
         if (!user) window.location.href = 'index.html';
@@ -62,52 +60,46 @@
         loadData();
 
         function loadData() {
-            document.getElementById('mainContent').innerHTML = 
-                '<div style="text-align:center;padding:40px;">🔄 Загрузка данных из Google Таблиц...</div>';
+            document.getElementById('mainContent').innerHTML = '<div style="text-align:center;padding:40px;">🔄 Загрузка данных из Google Таблиц...</div>';
             
             var sheetId = SHEET_IDS[user.group] || SHEET_IDS['102'];
             
-            loadFullData(sheetId, user.name).then(function(data) {
-                if (data) renderPage(data);
-                else showError('Студент не найден в таблице группы ' + user.group);
+            Promise.all([
+                fetch('https://docs.google.com/spreadsheets/d/' + sheetId + '/gviz/tq?tqx=out:json&sheet=ПЗ').then(function(r){return r.text();}),
+                fetch('https://docs.google.com/spreadsheets/d/' + sheetId + '/gviz/tq?tqx=out:json&sheet=ЛР').then(function(r){return r.text();}),
+                fetch('https://docs.google.com/spreadsheets/d/' + sheetId + '/gviz/tq?tqx=out:json&sheet=Допуск').then(function(r){return r.text();})
+            ]).then(function(results) {
+                var pz = parseSheet(results[0]);
+                var lr = parseSheet(results[1]);
+                var dop = parseSheet(results[2]);
+                
+                var search = user.name.toLowerCase().replace(/\s+/g, ' ').trim();
+                var pzRow = findRow(pz, search);
+                var lrRow = findRow(lr, search);
+                var dopRow = findRow(dop, search);
+                
+                if (!pzRow && !lrRow) {
+                    showError('Студент не найден в таблице группы ' + user.group);
+                    return;
+                }
+                
+                renderPage({ pz: pzRow, lr: lrRow, dop: dopRow });
             }).catch(function(e) {
                 console.error(e);
                 showError('Ошибка загрузки данных');
             });
         }
 
-        function loadFullData(sheetId, studentName) {
-            return Promise.all([
-                fetch('https://docs.google.com/spreadsheets/d/' + sheetId + '/gviz/tq?tqx=out:json&sheet=ПЗ').then(r => r.text()),
-                fetch('https://docs.google.com/spreadsheets/d/' + sheetId + '/gviz/tq?tqx=out:json&sheet=ЛР').then(r => r.text()),
-                fetch('https://docs.google.com/spreadsheets/d/' + sheetId + '/gviz/tq?tqx=out:json&sheet=Допуск').then(r => r.text())
-            ]).then(function(results) {
-                var pz = parseSheet(results[0], 'ПЗ');
-                var lr = parseSheet(results[1], 'ЛР');
-                var dop = parseSheet(results[2], 'Допуск');
-                
-                var search = studentName.toLowerCase().replace(/\s+/g, ' ').trim();
-                var pzRow = findRow(pz, search);
-                var lrRow = findRow(lr, search);
-                var dopRow = findRow(dop, search);
-                
-                return { pz: pzRow, lr: lrRow, dop: dopRow };
-            });
-        }
-
-        function parseSheet(text, type) {
+        function parseSheet(text) {
             var json = JSON.parse(text.substring(text.indexOf('{'), text.lastIndexOf('}') + 1));
             var rows = json.table.rows;
             var students = [];
-            var startRow = 2;
-            
-            for (var i = startRow; i < rows.length; i++) {
+            for (var i = 2; i < rows.length; i++) {
                 var cells = rows[i].c;
                 if (!cells) continue;
-                var fioCol = type === 'Допуск' ? 1 : 3;
-                var fio = cells[fioCol] ? String(cells[fioCol].v || '').trim() : '';
-                if (!fio || fio === 'Фамилия Имя') continue;
-                students.push({ fio: fio, cells: cells, type: type });
+                var fio = cells[3] ? String(cells[3].v || '').trim() : '';
+                if (!fio) continue;
+                students.push({ fio: fio, cells: cells });
             }
             return students;
         }
@@ -129,195 +121,6 @@
             return String(v).trim();
         }
 
-                function renderPage(data) {
-            var pzTasks = extractTasks(data.pz, 'ПЗ');
-            var lrTasks = extractTasks(data.lr, 'ЛР');
-            
-            var pzAll = Object.values(pzTasks);
-            var lrAll = Object.values(lrTasks);
-            var allTasks = pzAll.concat(lrAll);
-            
-            // Сдано
-            var done = allTasks.filter(function(t) {
-                return t.grade && !isNaN(parseFloat(t.grade)) && parseFloat(t.grade) > 0 && t.status !== '2';
-            }).length;
-            
-            // Долги
-            var debts = allTasks.filter(function(t) {
-                return t.status === '2' || t.status === 'н' || !t.grade || t.grade === '' || t.grade === '0';
-            }).length;
-            
-            var total = allTasks.length;
-            
-            // Средние баллы
-            var pzGrades = [];
-            pzAll.forEach(function(t) {
-                if (t.grade && !isNaN(parseFloat(t.grade)) && parseFloat(t.grade) > 0 && t.status !== '2') {
-                    pzGrades.push(parseFloat(t.grade));
-                }
-            });
-            
-            var lrGrades = [];
-            lrAll.forEach(function(t) {
-                if (t.grade && !isNaN(parseFloat(t.grade)) && parseFloat(t.grade) > 0 && t.status !== '2') {
-                    lrGrades.push(parseFloat(t.grade));
-                }
-            });
-            
-            var allGrades = pzGrades.concat(lrGrades);
-            
-            var avgPZ = pzGrades.length ? (pzGrades.reduce(function(a,b){return a+b},0) / pzGrades.length) : 0;
-            var avgLR = lrGrades.length ? (lrGrades.reduce(function(a,b){return a+b},0) / lrGrades.length) : 0;
-            var avgAll = allGrades.length ? (allGrades.reduce(function(a,b){return a+b},0) / allGrades.length) : 0;
-            
-            avgPZ = Math.round(avgPZ * 10) / 10;
-            avgLR = Math.round(avgLR * 10) / 10;
-            avgAll = Math.round(avgAll * 10) / 10;
-
-            // Данные из листа Допуск
-            var dopText = '';
-            if (data.dop && data.dop.cells) {
-                var dc = data.dop.cells;
-                var dopusk = getVal(dc[2]) || '—';
-                var avtomat = getVal(dc[3]) || '—';
-                dopText = dopusk + ' | Автомат: ' + avtomat;
-            }
-
-            var h = '<h2>📊 Мои оценки</h2>';
-            h += '<p class="text-muted">' + user.name + ' | Группа ' + user.group + '</p>';
-
-            // ЕДИНАЯ панель статистики
-            h += '<div class="stats-grid">';
-            h += '<div class="stat-card"><div class="val c-green">' + done + '/' + total + '</div><div class="lbl">✅ Сдано работ</div></div>';
-            h += '<div class="stat-card"><div class="val c-red">' + debts + '</div><div class="lbl">❌ Долгов</div></div>';
-            h += '<div class="stat-card"><div class="val c-blue">' + (avgAll || '—') + '</div><div class="lbl">📊 Средний балл</div></div>';
-            h += '<div class="stat-card"><div class="val c-yellow">' + (avgPZ || '—') + ' / ' + (avgLR || '—') + '</div><div class="lbl">📝 ПЗ / 🔬 ЛР</div></div>';
-            if (dopText) {
-                h += '<div class="stat-card"><div class="val" style="font-size:1.2em;color:#6366f1;">' + dopText + '</div><div class="lbl">🎯 Допуск</div></div>';
-            }
-            h += '</div>';
-
-            // Прогресс-бар
-            var pct = total ? Math.round(done / total * 100) : 0;
-            var fillClass = pct >= 80 ? 'fill-green' : pct >= 50 ? 'fill-yellow' : 'fill-red';
-            h += '<div style="margin:8px 0;font-size:.8em;">Прогресс: <b>' + pct + '%</b> (' + done + ' из ' + total + ' сдано, ' + debts + ' долгов)</div>';
-            h += '<div class="progress-bar"><div class="progress-fill ' + fillClass + '" style="width:' + pct + '%"></div></div>';
-
-            // Практические занятия
-            h += '<div class="section-title">📝 Практические занятия (средний балл: ' + (avgPZ || '—') + ')</div>';
-            h += '<div class="task-grid">';
-            var pzOrder = ['ПЗ 1','ПЗ 2','ПЗ 3','ПЗ 5','ПЗ 6','ПЗ 7','ПЗ 8','ПЗ 9','ПЗ 10','ПЗ 11','ПЗ 12','ПЗ 13','ПЗ 14','ПЗ 15','ПЗ 16','ПЗ 17','ПЗ 18','ПЗ 19','ПЗ 20','ПЗ 21','ПЗ 24','ПЗ 25','ПЗ 27','ПЗ 28','ПЗ 29'];
-            pzOrder.forEach(function(id) {
-                if (pzTasks[id] !== undefined) {
-                    h += renderCard(id, id, pzTasks[id]);
-                }
-            });
-            h += '</div>';
-
-            // Лабораторные работы
-            h += '<div class="section-title">🔬 Лабораторные работы (средний балл: ' + (avgLR || '—') + ')</div>';
-            h += '<div class="task-grid">';
-            var lrOrder = ['ЛР 1','ЛР 2','ЛР 3','ЛР 4','ЛР 5','ЛР 6','ЛР 7','ЛР 8','ЛР 9','ЛР 10','ЛР 11','ЛР 12','ЛР 13','ЛР 14','ЛР 15','ЛР 16'];
-            lrOrder.forEach(function(id) {
-                if (lrTasks[id] !== undefined) {
-                    h += renderCard(id, id, lrTasks[id]);
-                }
-            });
-            h += '</div>';
-
-            h += '<button class="btn btn-secondary btn-sm mt-2" onclick="loadData()">🔄 Обновить</button>';
-            h += '<p style="font-size:.65em;color:#94a3b8;margin-top:4px;">Данные из Google Таблиц (листы ПЗ, ЛР, Допуск)</p>';
-
-            document.getElementById('mainContent').innerHTML = h;
-        }
-            
-            var lrGrades = [];
-            lrAll.forEach(function(t) {
-                if (t.grade && !isNaN(parseFloat(t.grade)) && parseFloat(t.grade) > 0 && t.status !== '2' && t.status !== 'н') {
-                    lrGrades.push(parseFloat(t.grade));
-                }
-            });
-            
-            var allGrades = pzGrades.concat(lrGrades);
-            
-            var avgPZ = pzGrades.length ? (pzGrades.reduce(function(a,b){return a+b},0) / pzGrades.length) : 0;
-            var avgLR = lrGrades.length ? (lrGrades.reduce(function(a,b){return a+b},0) / lrGrades.length) : 0;
-            var avgAll = allGrades.length ? (allGrades.reduce(function(a,b){return a+b},0) / allGrades.length) : 0;
-            
-            // Округляем до десятых
-            avgPZ = Math.round(avgPZ * 10) / 10;
-            avgLR = Math.round(avgLR * 10) / 10;
-            avgAll = Math.round(avgAll * 10) / 10;
-
-            // Данные из листа Допуск
-            var dopData = {};
-            if (data.dop && data.dop.cells) {
-                var dc = data.dop.cells;
-                dopData.dopusk = getVal(dc[2]);
-                dopData.avtomat = getVal(dc[3]);
-                dopData.avg = getVal(dc[8]);
-                // Округляем среднюю из Допуска
-                var rawAvg = parseFloat(dopData.avg);
-                dopData.avg = !isNaN(rawAvg) ? Math.round(rawAvg * 10) / 10 : '—';
-                dopData.debts = getVal(dc[6]);
-                dopData.skipped = getVal(dc[7]);
-            }
-
-            var h = '<h2>📊 Мои оценки</h2>';
-            h += '<p class="text-muted">' + user.name + ' | Группа ' + user.group + '</p>';
-
-            // Основная статистика
-            h += '<div class="stats-grid">';
-            h += '<div class="stat-card"><div class="val c-green">' + done + '/' + total + '</div><div class="lbl">✅ Сдано работ</div></div>';
-            h += '<div class="stat-card"><div class="val c-red">' + debts + '</div><div class="lbl">❌ Долгов</div></div>';
-            h += '<div class="stat-card"><div class="val c-blue">' + (avgAll || '—') + '</div><div class="lbl">📊 Средний балл</div></div>';
-            h += '<div class="stat-card"><div class="val c-yellow">' + (avgPZ || '—') + ' / ' + (avgLR || '—') + '</div><div class="lbl">📝 ПЗ / 🔬 ЛР</div></div>';
-            h += '</div>';
-
-            // Данные из листа Допуск
-            if (data.dop) {
-                h += '<div class="stats-grid">';
-                h += '<div class="stat-card"><div class="val" style="color:' + (dopData.dopusk === 'ДОП' ? '#059669' : '#dc2626') + ';">' + (dopData.dopusk || '—') + '</div><div class="lbl">🎯 Допуск к Д/З</div></div>';
-                h += '<div class="stat-card"><div class="val" style="color:#2563eb;">' + (dopData.avtomat || '—') + '</div><div class="lbl">🤖 Автомат</div></div>';
-                h += '<div class="stat-card"><div class="val" style="color:#d97706;">' + (dopData.avg || '—') + '</div><div class="lbl">📈 Средняя оценка</div></div>';
-                h += '<div class="stat-card"><div class="val" style="color:#dc2626;">' + (dopData.debts || '0') + '</div><div class="lbl">📋 Осталось сдать (по формуле)</div></div>';
-                h += '</div>';
-            }
-
-            // Прогресс-бар
-            var pct = total ? Math.round(done / total * 100) : 0;
-            var fillClass = pct >= 80 ? 'fill-green' : pct >= 50 ? 'fill-yellow' : 'fill-red';
-            h += '<div style="margin:8px 0;font-size:.8em;">Прогресс: <b>' + pct + '%</b> (' + done + ' из ' + total + ' сдано, ' + debts + ' долгов)</div>';
-            h += '<div class="progress-bar"><div class="progress-fill ' + fillClass + '" style="width:' + pct + '%"></div></div>';
-
-            // Практические занятия
-            h += '<div class="section-title">📝 Практические занятия (средний балл: ' + (avgPZ || '—') + ')</div>';
-            h += '<div class="task-grid">';
-            var pzOrder = ['ПЗ 1','ПЗ 2','ПЗ 3','ПЗ 5','ПЗ 6','ПЗ 7','ПЗ 8','ПЗ 9','ПЗ 10','ПЗ 11','ПЗ 12','ПЗ 13','ПЗ 14','ПЗ 15','ПЗ 16','ПЗ 17','ПЗ 18','ПЗ 19','ПЗ 20','ПЗ 21','ПЗ 24','ПЗ 25','ПЗ 27','ПЗ 28','ПЗ 29'];
-            pzOrder.forEach(function(id) {
-                if (pzTasks[id] !== undefined) {
-                    h += renderCard(id, id, pzTasks[id]);
-                }
-            });
-            h += '</div>';
-
-            // Лабораторные работы
-            h += '<div class="section-title">🔬 Лабораторные работы (средний балл: ' + (avgLR || '—') + ')</div>';
-            h += '<div class="task-grid">';
-            var lrOrder = ['ЛР 1','ЛР 2','ЛР 3','ЛР 4','ЛР 5','ЛР 6','ЛР 7','ЛР 8','ЛР 9','ЛР 10','ЛР 11','ЛР 12','ЛР 13','ЛР 14','ЛР 15','ЛР 16'];
-            lrOrder.forEach(function(id) {
-                if (lrTasks[id] !== undefined) {
-                    h += renderCard(id, id, lrTasks[id]);
-                }
-            });
-            h += '</div>';
-
-            h += '<button class="btn btn-secondary btn-sm mt-2" onclick="loadData()">🔄 Обновить</button>';
-            h += '<p style="font-size:.65em;color:#94a3b8;margin-top:4px;">Данные из Google Таблиц (листы ПЗ, ЛР, Допуск)</p>';
-
-            document.getElementById('mainContent').innerHTML = h;
-        }
-
         function extractTasks(row, type) {
             var tasks = {};
             if (!row) return tasks;
@@ -327,72 +130,86 @@
                 var cols = [6,8,10,12,14,16,18,20,22,24,26,28,30,32,34,36,38,40,42,44,46,48,50,52,54];
                 var names = ['ПЗ 1','ПЗ 2','ПЗ 3','ПЗ 5','ПЗ 6','ПЗ 7','ПЗ 8','ПЗ 9','ПЗ 10','ПЗ 11','ПЗ 12','ПЗ 13','ПЗ 14','ПЗ 15','ПЗ 16','ПЗ 17','ПЗ 18','ПЗ 19','ПЗ 20','ПЗ 21','ПЗ 24','ПЗ 25','ПЗ 27','ПЗ 28','ПЗ 29'];
                 for (var i = 0; i < cols.length; i++) {
-                    tasks[names[i]] = {
-                        status: getVal(cells[cols[i]]),
-                        grade: getVal(cells[cols[i] + 1])
-                    };
+                    tasks[names[i]] = { status: getVal(cells[cols[i]]), grade: getVal(cells[cols[i] + 1]) };
                 }
-            } else if (type === 'ЛР') {
+            } else {
                 var cols = [4,6,8,10,12,14,16,18,20,22,24,26,28,30,32,34];
                 var names = ['ЛР 1','ЛР 2','ЛР 3','ЛР 4','ЛР 5','ЛР 6','ЛР 7','ЛР 8','ЛР 9','ЛР 10','ЛР 11','ЛР 12','ЛР 13','ЛР 14','ЛР 15','ЛР 16'];
                 for (var i = 0; i < cols.length; i++) {
-                    tasks[names[i]] = {
-                        status: getVal(cells[cols[i]]),
-                        grade: getVal(cells[cols[i] + 1])
-                    };
+                    tasks[names[i]] = { status: getVal(cells[cols[i]]), grade: getVal(cells[cols[i] + 1]) };
                 }
             }
             return tasks;
         }
 
-        function renderCard(id, name, task) {
-            var status = task ? (task.status || '') : '';
-            var grade = task ? (task.grade || '') : '';
+        function renderPage(data) {
+            var pzTasks = extractTasks(data.pz, 'ПЗ');
+            var lrTasks = extractTasks(data.lr, 'ЛР');
+            var pzAll = Object.values(pzTasks);
+            var lrAll = Object.values(lrTasks);
+            var allTasks = pzAll.concat(lrAll);
             
+            var done = allTasks.filter(function(t){ return t.grade && !isNaN(parseFloat(t.grade)) && parseFloat(t.grade) > 0 && t.status !== '2'; }).length;
+            var debts = allTasks.filter(function(t){ return t.status === '2' || t.status === 'н' || !t.grade || t.grade === '' || t.grade === '0'; }).length;
+            var total = allTasks.length;
+            
+            var pzGrades = []; pzAll.forEach(function(t){ if(t.grade && !isNaN(parseFloat(t.grade)) && parseFloat(t.grade)>0 && t.status!=='2') pzGrades.push(parseFloat(t.grade)); });
+            var lrGrades = []; lrAll.forEach(function(t){ if(t.grade && !isNaN(parseFloat(t.grade)) && parseFloat(t.grade)>0 && t.status!=='2') lrGrades.push(parseFloat(t.grade)); });
+            var allGrades = pzGrades.concat(lrGrades);
+            
+            var avgPZ = pzGrades.length ? Math.round((pzGrades.reduce(function(a,b){return a+b},0)/pzGrades.length)*10)/10 : 0;
+            var avgLR = lrGrades.length ? Math.round((lrGrades.reduce(function(a,b){return a+b},0)/lrGrades.length)*10)/10 : 0;
+            var avgAll = allGrades.length ? Math.round((allGrades.reduce(function(a,b){return a+b},0)/allGrades.length)*10)/10 : 0;
+
+            var dopText = '';
+            if (data.dop && data.dop.cells) {
+                var dc = data.dop.cells;
+                var dopusk = getVal(dc[2]) || '—';
+                var avtomat = getVal(dc[3]) || '—';
+                dopText = dopusk + ' | Автомат: ' + avtomat;
+            }
+
+            var h = '<h2>Мои оценки</h2>';
+            h += '<p class="text-muted">' + user.name + ' | Группа ' + user.group + '</p>';
+            h += '<div class="stats-grid">';
+            h += '<div class="stat-card"><div class="val c-green">' + done + '/' + total + '</div><div class="lbl">Сдано работ</div></div>';
+            h += '<div class="stat-card"><div class="val c-red">' + debts + '</div><div class="lbl">Долгов</div></div>';
+            h += '<div class="stat-card"><div class="val c-blue">' + (avgAll||'—') + '</div><div class="lbl">Средний балл</div></div>';
+            h += '<div class="stat-card"><div class="val c-yellow">' + (avgPZ||'—') + ' / ' + (avgLR||'—') + '</div><div class="lbl">ПЗ / ЛР</div></div>';
+            if (dopText) h += '<div class="stat-card"><div class="val" style="font-size:1.2em;color:#6366f1;">' + dopText + '</div><div class="lbl">Допуск</div></div>';
+            h += '</div>';
+
+            var pct = total ? Math.round(done/total*100) : 0;
+            var fc = pct>=80?'fill-green':pct>=50?'fill-yellow':'fill-red';
+            h += '<div style="margin:8px 0;font-size:.8em;">Прогресс: <b>' + pct + '%</b> (' + done + ' из ' + total + ' сдано, ' + debts + ' долгов)</div>';
+            h += '<div class="progress-bar"><div class="progress-fill ' + fc + '" style="width:' + pct + '%"></div></div>';
+
+            h += '<div class="section-title">Практические занятия (ср. балл: ' + (avgPZ||'—') + ')</div><div class="task-grid">';
+            ['ПЗ 1','ПЗ 2','ПЗ 3','ПЗ 5','ПЗ 6','ПЗ 7','ПЗ 8','ПЗ 9','ПЗ 10','ПЗ 11','ПЗ 12','ПЗ 13','ПЗ 14','ПЗ 15','ПЗ 16','ПЗ 17','ПЗ 18','ПЗ 19','ПЗ 20','ПЗ 21','ПЗ 24','ПЗ 25','ПЗ 27','ПЗ 28','ПЗ 29'].forEach(function(id){ if(pzTasks[id]!==undefined) h+=renderCard(id,pzTasks[id]); });
+            h += '</div>';
+
+            h += '<div class="section-title">Лабораторные работы (ср. балл: ' + (avgLR||'—') + ')</div><div class="task-grid">';
+            ['ЛР 1','ЛР 2','ЛР 3','ЛР 4','ЛР 5','ЛР 6','ЛР 7','ЛР 8','ЛР 9','ЛР 10','ЛР 11','ЛР 12','ЛР 13','ЛР 14','ЛР 15','ЛР 16'].forEach(function(id){ if(lrTasks[id]!==undefined) h+=renderCard(id,lrTasks[id]); });
+            h += '</div>';
+
+            h += '<button class="btn btn-secondary btn-sm mt-2" onclick="loadData()">Обновить</button>';
+            document.getElementById('mainContent').innerHTML = h;
+        }
+
+        function renderCard(id, task) {
+            var status = task ? (task.status||'') : '';
+            var grade = task ? (task.grade||'') : '';
             var hasGrade = grade && !isNaN(parseFloat(grade)) && parseFloat(grade) > 0;
-            var isDebt = false;
-            var isDone = false;
-            
-            // Логика: "н" + оценка = сдано (не был, но сдал)
-            if (hasGrade && status !== '2') {
-                // Есть оценка и нет "2" — сдано
-                isDone = true;
-            } else if (status === '2' || status === 'н' || (!hasGrade && !status) || grade === '' || grade === '0') {
-                // "2" без оценки, "н" без оценки, пусто — долг
-                isDebt = true;
-            }
-            
-            var display = '—';
-            var cls = 'grade-empty';
-            var badge = '';
-            
-            if (isDone) {
-                display = grade;
-                var g = parseFloat(grade);
-                if (g >= 5) cls = 'grade-5';
-                else if (g >= 4) cls = 'grade-4';
-                else if (g >= 3) cls = 'grade-3';
-                else cls = 'grade-2';
-                badge = '<span class="status-badge badge-done">✔</span>';
-            } else if (isDebt) {
-                display = 'долг';
-                cls = 'grade-2';
-                badge = '<span class="status-badge badge-fail">✘</span>';
-            }
-            
-            return '<div class="task-card">' +
-                '<h4>' + name + '</h4>' +
-                '<div class="grade ' + cls + '">' + display + '</div>' +
-                badge + '</div>';
+            var isDone = hasGrade && status !== '2';
+            var isDebt = !isDone;
+            var display = isDone ? grade : 'долг';
+            var cls = isDone ? ('grade-' + (parseFloat(grade)>=5?'5':parseFloat(grade)>=4?'4':parseFloat(grade)>=3?'3':'2')) : 'grade-2';
+            var badge = isDone ? '<span class="status-badge badge-done">✔</span>' : '<span class="status-badge badge-fail">✘</span>';
+            return '<div class="task-card"><h4>' + id + '</h4><div class="grade ' + cls + '">' + display + '</div>' + badge + '</div>';
         }
 
         function showError(msg) {
-            document.getElementById('mainContent').innerHTML = 
-                '<h2>📊 Мои оценки</h2>' +
-                '<p class="text-muted">' + user.name + ' | Группа ' + user.group + '</p>' +
-                '<div style="text-align:center;padding:40px;color:#dc2626;">' +
-                '<p>❌ ' + msg + '</p>' +
-                '<button class="btn btn-primary mt-2" onclick="loadData()">🔄 Попробовать снова</button></div>';
+            document.getElementById('mainContent').innerHTML = '<h2>Мои оценки</h2><p class="text-muted">' + user.name + ' | Группа ' + user.group + '</p><div style="text-align:center;padding:40px;color:#dc2626;"><p>' + msg + '</p><button class="btn btn-primary mt-2" onclick="loadData()">Попробовать снова</button></div>';
         }
 
         function doLogout() {
