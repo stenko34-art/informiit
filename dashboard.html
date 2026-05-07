@@ -15,20 +15,15 @@
         .badge-done{background:#ecfdf5;color:#065f46}.badge-fail{background:#fef2f2;color:#991b1b}
         .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin:12px 0}
         .stat-card{background:linear-gradient(135deg,#f8fafc,#fff);border:1px solid #e2e8f0;border-radius:10px;padding:12px;text-align:center}
-        .stat-card .val{font-size:1.8em;font-weight:700}
-        .stat-card .lbl{font-size:.7em;color:#64748b;margin-top:2px}
+        .stat-card .val{font-size:1.8em;font-weight:700}.stat-card .lbl{font-size:.7em;color:#64748b;margin-top:2px}
         .c-green{color:#059669}.c-red{color:#dc2626}.c-blue{color:#2563eb}.c-yellow{color:#d97706}
         .section-title{margin:14px 0 6px;font-weight:700;font-size:.85em;color:#1e293b;border-bottom:2px solid #e2e8f0;padding-bottom:4px}
         .progress-bar{background:#e2e8f0;border-radius:4px;height:6px;margin-top:4px;overflow:hidden}
-        .progress-fill{height:6px;border-radius:4px}
-        .fill-green{background:#059669}.fill-red{background:#dc2626}.fill-yellow{background:#d97706}
+        .progress-fill{height:6px;border-radius:4px}.fill-green{background:#059669}.fill-red{background:#dc2626}.fill-yellow{background:#d97706}
     </style>
 </head>
 <body>
-    <header class="header">
-        <h1>📚 Информатика — СПО 1 курс</h1>
-        <div class="user-block"><span id="userName"></span><button class="btn btn-outline btn-sm" onclick="doLogout()">🚪 Выйти</button></div>
-    </header>
+    <header class="header"><h1>📚 Информатика — СПО 1 курс</h1><div class="user-block"><span id="userName"></span><button class="btn btn-outline btn-sm" onclick="doLogout()">🚪 Выйти</button></div></header>
     <div class="container"><main class="main-content" id="mainContent" style="width:100%;"><div style="text-align:center;padding:40px;">🔄 Загрузка...</div></main></div>
 
     <script src="js/auth.js"></script>
@@ -38,14 +33,10 @@
         document.getElementById('userName').textContent = user.name + ' (гр. ' + user.group + ')';
 
         var SHEET_IDS = {
-            '101':'1e4fcZ6J6fHfsvb6xca8lP5AwSRT2t7b02GcHEZfTmwU',
-            '102':'1AeNAFAkY1EDD4NfVUmk04j2nqZK3l2ltdXuDNX6bB-Q',
-            '103':'1LSe4uS98lWDNyjigS028Kn4lV42u7N2DUjyJo3y3RHc',
-            '104':'1Z8uVSazOeBtclHgIBsYEBFCD_RikTjPzQyjyAZF2t3Y',
-            '105':'1Zga2Kn2BjzL1RCidFiNDbDtQF7IbLZzdZ8AE7AXM9fw',
-            '106':'1fNXJCnmJ_szR50v2RfPKx_xR2gHDL44hr7SxHI1oLgo',
-            '107':'1m-D6b57CdSPDEw6vcevvVMB4twmJReLa8xS4qyMFJ2Y',
-            '108':'1qwWCSk-EDVq1amZ3Hn8fKsJULBkthr8lr9_x68vjlsY'
+            '101':'1e4fcZ6J6fHfsvb6xca8lP5AwSRT2t7b02GcHEZfTmwU','102':'1AeNAFAkY1EDD4NfVUmk04j2nqZK3l2ltdXuDNX6bB-Q',
+            '103':'1LSe4uS98lWDNyjigS028Kn4lV42u7N2DUjyJo3y3RHc','104':'1Z8uVSazOeBtclHgIBsYEBFCD_RikTjPzQyjyAZF2t3Y',
+            '105':'1Zga2Kn2BjzL1RCidFiNDbDtQF7IbLZzdZ8AE7AXM9fw','106':'1fNXJCnmJ_szR50v2RfPKx_xR2gHDL44hr7SxHI1oLgo',
+            '107':'1m-D6b57CdSPDEw6vcevvVMB4twmJReLa8xS4qyMFJ2Y','108':'1qwWCSk-EDVq1amZ3Hn8fKsJULBkthr8lr9_x68vjlsY'
         };
 
         function getV(c){if(!c)return'';var v=c.v;if(v===null||v===undefined)v=c.f||'';return String(v).trim();}
@@ -55,60 +46,66 @@
             var rows=json.table.rows;
             var tasks={};
             
-            // Ищем студента по ФИО в столбце D (индекс 3)
-            var studentRow=-1;
+            // Ищем студента в столбце D (индекс 3)
+            var cells=null;
             for(var i=2;i<rows.length;i++){
                 var c=rows[i].c;if(!c||!c[3])continue;
                 var f=getV(c[3]).toLowerCase().replace(/\s+/g,' ');
-                if(f===search||f.includes(search)||search.includes(f)){studentRow=i;break;}
+                if(f===search||f.includes(search)||search.includes(f)){cells=c;break;}
             }
-            if(studentRow===-1)return{tasks:{}};
+            if(!cells)return{tasks:{}};
             
-            var cells=rows[studentRow].c;
+            // ЕДИНЫЙ АЛГОРИТМ: идём по заголовкам из 2-й строки (индекс 1)
+            var headers=rows[1].c;
+            var prevNum=0;
             
-            // КАРТА СТОЛБЦОВ ДЛЯ КАЖДОЙ ГРУППЫ
-            // Формат: [индекс_статуса, индекс_оценки, номер_работы]
-            var taskMap;
-            
-            if(type==='ПЗ'){
-                if(user.group==='101') taskMap=[[6,7,1],[8,9,2],[10,11,3],[12,13,5],[14,15,6],[16,17,7],[18,19,8],[20,21,9],[22,23,19],[24,25,10],[26,27,11],[28,29,12],[30,31,13],[32,33,14],[34,35,15],[36,37,16],[38,null,'П/Р'],[39,40,17],[41,42,19],[43,44,20],[45,46,25],[47,48,27],[49,50,28],[51,52,29]];
-                else if(user.group==='102') taskMap=[[6,7,1],[8,9,2],[10,11,3],[12,13,5],[14,15,6],[16,17,7],[18,19,8],[20,21,9],[22,23,10],[24,25,11],[26,27,12],[28,29,13],[30,31,14],[32,33,15],[34,35,16],[36,null,'П/Р'],[37,38,17],[39,40,18],[41,42,19],[43,44,20],[45,46,21],[47,48,24],[49,50,25],[51,52,27],[53,54,28],[55,56,29]];
-                else if(user.group==='103') taskMap=[[6,7,1],[8,9,2],[10,11,3],[12,13,5],[14,15,6],[16,17,7],[18,19,8],[20,21,9],[22,23,10],[24,25,11],[26,27,12],[28,29,13],[30,31,14],[32,33,15],[34,35,16],[36,null,'П.Р'],[37,38,17],[39,40,18],[41,42,19],[43,44,20],[45,46,21],[47,48,24],[49,50,25],[51,52,27],[53,54,28],[55,56,29],[57,58,30],[59,60,31],[61,62,32],[63,64,33],[65,66,34]];
-                else if(user.group==='104') taskMap=[[6,7,1],[8,9,2],[10,11,3],[12,13,5],[14,15,6],[16,17,7],[18,19,8],[20,21,9],[22,23,10],[24,25,11],[26,27,12],[28,29,13],[30,31,14],[32,33,15],[34,35,16],[36,null,'П/Р'],[37,38,17],[39,40,19],[41,42,20],[43,44,25],[45,46,27],[47,48,28],[49,50,29],[51,52,31]];
-                else if(user.group==='105') taskMap=[[6,7,1],[8,9,2],[10,11,3],[12,null,'С.С.'],[13,14,5],[15,16,6],[17,18,7],[19,20,8],[21,22,9],[23,24,19],[25,26,10],[27,28,11],[29,30,12],[31,32,13],[33,34,14],[35,36,15],[37,38,16],[39,40,17],[41,42,19],[43,44,20],[45,46,25],[47,48,27],[49,50,28]];
-                else if(user.group==='106') taskMap=[[6,7,1],[8,9,2],[10,null,'С.С'],[11,12,3],[13,14,5],[15,16,6],[17,18,7],[19,20,8],[21,22,9],[23,24,10],[25,26,11],[27,28,12],[29,30,13],[31,32,14],[33,34,15],[35,36,16],[37,null,'П/Р'],[38,39,17],[40,41,18],[42,43,19],[44,45,20]];
-                else if(user.group==='107') taskMap=[[6,7,1],[8,9,2],[10,11,3],[12,13,5],[14,15,6],[16,17,'ДО'],[18,19,7],[20,21,8],[22,23,9],[24,25,10],[26,27,11],[28,29,12],[30,31,13],[32,33,14],[34,35,15],[36,37,16],[38,null,'П.Р.'],[39,40,17],[41,42,19],[43,44,20],[45,46,25],[47,48,27],[49,50,28]];
-                else if(user.group==='108') taskMap=[[11,12,1],[13,14,2],[15,16,3],[17,18,5],[19,20,6],[21,22,7],[23,24,8],[25,26,9],[27,28,10],[29,30,11],[31,32,12],[33,34,13],[35,36,14],[37,38,15],[39,40,16],[41,42,17],[43,44,18],[45,46,19],[47,null,'П/Р'],[48,49,20],[50,51,21],[52,53,23],[54,55,24],[56,57,25],[58,59,26],[60,61,27],[62,63,29],[64,65,30],[66,67,31],[68,69,33]];
-                else taskMap=[];
-            } else { // ЛР
-                if(user.group==='101') taskMap=[[6,7,1],[8,9,2],[10,11,3],[12,13,5],[14,15,6],[16,17,7],[18,19,8],[20,21,9],[22,23,19],[24,25,10],[26,27,11],[28,29,12],[30,31,13],[32,33,14],[34,35,15],[36,37,16],[38,null,'П/Р'],[39,40,17],[41,42,19],[43,44,20],[45,46,25],[47,48,27],[49,50,28],[51,52,29]];
-                else if(user.group==='102') taskMap=[[4,5,1],[6,7,2],[8,9,3],[10,11,4],[12,13,5],[14,15,6],[16,17,7],[18,19,8],[20,21,9],[22,23,10],[24,25,11],[26,27,12],[28,29,13],[30,31,14],[32,33,15],[34,35,16]];
-                else if(user.group==='103') taskMap=[[4,5,1],[6,7,2],[8,9,3],[10,11,4],[12,13,5],[14,15,6],[16,17,7],[18,19,8],[20,21,9],[22,23,10],[24,25,11],[26,27,12],[28,29,13],[30,31,14],[32,33,15],[34,35,16]];
-                else if(user.group==='104') taskMap=[[4,5,1],[6,7,2],[8,9,3],[10,11,4],[12,13,5],[14,15,6],[16,17,7],[18,19,8],[20,21,9],[22,23,10],[24,25,11],[26,27,12],[28,29,13],[30,31,14],[32,33,15],[34,35,16]];
-                else if(user.group==='105') taskMap=[[6,7,1],[8,9,2],[10,11,3],[12,null,'С.С.'],[13,14,5],[15,16,6],[17,18,7],[19,20,8],[21,22,9],[23,24,19],[25,26,10],[27,28,11],[29,30,12],[31,32,13],[33,34,14],[35,36,15],[37,38,16],[39,40,17],[41,42,19],[43,44,20],[45,46,25],[47,48,27],[49,50,28]];
-                else if(user.group==='106') taskMap=[[4,5,1],[6,7,2],[8,9,3],[10,11,4],[12,13,5],[14,15,6],[16,17,7],[18,19,8],[20,21,9],[22,23,10],[24,25,11],[26,27,12],[28,29,13],[30,31,14],[32,33,15],[34,35,16]];
-                else if(user.group==='107') taskMap=[[4,5,1],[6,7,2],[8,9,3],[10,11,4],[12,13,5],[14,15,6],[16,17,7],[18,19,8],[20,21,9],[22,23,10],[24,25,11],[26,27,12],[28,29,13],[30,31,14],[32,33,15],[34,35,16]];
-                else if(user.group==='108') taskMap=[[4,5,1],[6,7,2],[8,9,3],[10,11,4],[12,13,5],[14,15,6],[16,17,7],[18,19,8],[20,21,9],[22,23,10],[24,25,11],[26,27,12],[28,29,13],[30,31,14],[32,33,15],[34,35,16]];
-                else taskMap=[];
+            for(var j=4;j<headers.length-3;j++){
+                var hdr=getV(headers[j]);
+                if(!hdr)continue;
+                
+                // Пропускаем служебные столбцы
+                var l=hdr.toLowerCase();
+                if(l.includes('вх')||l.includes('тест')||l.includes('п/р')||l.includes('excel')||
+                   l.includes('сред')||l.includes('проп')||l.includes('осталось')||l.includes('ссылка')||
+                   l.includes('номер')||l.includes('автом')||l.includes('допуск')||l.includes('с.с.')||
+                   l.includes('с.у.')||l.includes('д/з')||(l==='до'))continue;
+                
+                var match=hdr.match(/^(\d+)/);
+                if(!match)continue;
+                
+                var num=parseInt(match[1]);
+                if(num===prevNum)continue; // пропускаем сдвоенные столбцы
+                prevNum=num;
+                
+                var taskId=(type==='ПЗ'?'ПЗ ':'ЛР ')+num;
+                var nextHdr=getV(headers[j+1]);
+                var nextMatch=nextHdr.match(/^(\d+)/);
+                
+                if(nextMatch&&!nextHdr.toLowerCase().includes('excel')){
+                    tasks[taskId]={status:'',grade:getV(cells[j])};
+                }else{
+                    tasks[taskId]={status:getV(cells[j]),grade:getV(cells[j+1])};
+                }
             }
-            
-            // Заполняем задания
-            for(var i=0;i<taskMap.length;i++){
-                var m=taskMap[i];
-                if(m[2]==='П/Р'||m[2]==='П.Р.'||m[2]==='П.Р'||m[2]==='С.С'||m[2]==='С.С.'||m[2]==='ДО')continue;
-                var tid=(type==='ПЗ'?'ПЗ ':'ЛР ')+m[2];
-                tasks[tid]={
-                    status:m[1]!==null?getV(cells[m[0]]):'',
-                    grade:m[1]!==null?getV(cells[m[1]]):getV(cells[m[0]])
-                };
-            }
-            
             return{tasks:tasks};
+        }
+
+        function parseDop(text,search){
+            try{
+                var json=JSON.parse(text.substring(text.indexOf('{'),text.lastIndexOf('}')+1));
+                var rows=json.table.rows;
+                for(var i=2;i<rows.length;i++){
+                    var c=rows[i].c;if(!c||!c[1])continue;
+                    var f=getV(c[1]).toLowerCase().replace(/\s+/g,' ');
+                    if(f===search||f.includes(search)||search.includes(f))return{dopusk:getV(c[2]),avtomat:getV(c[3])};
+                }
+            }catch(e){}
+            return null;
         }
 
         function loadData(){
             var d=document.getElementById('mainContent');
-            d.innerHTML='<div style="text-align:center;padding:40px;">🔄 Загрузка...</div>';
+            d.innerHTML='<div style="text-align:center;padding:40px;">🔄 Загрузка данных...</div>';
             var sid=SHEET_IDS[user.group]||SHEET_IDS['102'];
             var search=user.name.toLowerCase().replace(/\s+/g,' ').trim();
             
@@ -127,47 +124,25 @@
             });
         }
 
-        function parseDop(text,search){
-            try{
-                var json=JSON.parse(text.substring(text.indexOf('{'),text.lastIndexOf('}')+1));
-                var rows=json.table.rows;
-                for(var i=2;i<rows.length;i++){
-                    var c=rows[i].c;if(!c||!c[1])continue;
-                    var f=getV(c[1]).toLowerCase().replace(/\s+/g,' ');
-                    if(f===search||f.includes(search)||search.includes(f)){
-                        return{dopusk:getV(c[2]),avtomat:getV(c[3])};
-                    }
-                }
-            }catch(e){}
-            return null;
-        }
-
         function renderPage(pz,lr,dop){
             var all={};for(var k in pz)all[k]=pz[k];for(var k in lr)all[k]=lr[k];
             var pzArr=Object.values(pz),lrArr=Object.values(lr),allArr=Object.values(all);
-            
             var done=allArr.filter(function(t){return t.grade&&!isNaN(parseFloat(t.grade))&&parseFloat(t.grade)>0&&t.status!=='2';}).length;
             var debts=allArr.filter(function(t){return t.status==='2'||t.status==='н'||!t.grade||t.grade===''||t.grade==='0';}).length;
             var total=allArr.length;
-            
             var getAvg=function(arr){var g=arr.filter(function(t){return t.grade&&!isNaN(parseFloat(t.grade))&&parseFloat(t.grade)>0&&t.status!=='2';}).map(function(t){return parseFloat(t.grade);});return g.length?Math.round(g.reduce(function(a,b){return a+b},0)/g.length*10)/10:0;};
             var avgPZ=getAvg(pzArr),avgLR=getAvg(lrArr),avgAll=getAvg(allArr);
-            
-            var dopText='',dopColor='#94a3b8',dopBg='#f1f5f9',avtText='',avtColor='#94a3b8',avtBg='#f1f5f9';
+            var dopT='',dopC='#94a3b8',dopB='#f1f5f9',avtT='',avtC='#94a3b8',avtB='#f1f5f9';
             if(dop){
-                if(dop.dopusk==='ДОП'){dopText='ДОПУЩЕН';dopColor='#059669';dopBg='#ecfdf5';}
-                else if(dop.dopusk==='НЕДОП'){dopText='НЕ ДОПУЩЕН';dopColor='#dc2626';dopBg='#fef2f2';}
-                if(dop.avtomat==='да'){avtText='АВТОМАТ';avtColor='#059669';avtBg='#ecfdf5';}
-                else if(dop.avtomat==='нет'){avtText='НЕТ АВТОМАТА';avtColor='#dc2626';avtBg='#fef2f2';}
+                if(dop.dopusk==='ДОП'){dopT='ДОПУЩЕН';dopC='#059669';dopB='#ecfdf5';}else if(dop.dopusk==='НЕДОП'){dopT='НЕ ДОПУЩЕН';dopC='#dc2626';dopB='#fef2f2';}
+                if(dop.avtomat==='да'){avtT='АВТОМАТ';avtC='#059669';avtB='#ecfdf5';}else if(dop.avtomat==='нет'){avtT='НЕТ АВТОМАТА';avtC='#dc2626';avtB='#fef2f2';}
             }
-
             var h='<h2>📊 Мои оценки</h2>';
             h+='<div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:16px;">';
             h+='<span class="text-muted">'+user.name+' | Группа '+user.group+'</span>';
-            if(dopText)h+='<span style="padding:4px 12px;border-radius:6px;font-size:.8em;font-weight:700;background:'+dopBg+';color:'+dopColor+';">'+dopText+'</span>';
-            if(avtText)h+='<span style="padding:4px 12px;border-radius:6px;font-size:.8em;font-weight:700;background:'+avtBg+';color:'+avtColor+';">'+avtText+'</span>';
-            h+='</div>';
-            h+='<div class="stats-grid">';
+            if(dopT)h+='<span style="padding:4px 12px;border-radius:6px;font-size:.8em;font-weight:700;background:'+dopB+';color:'+dopC+';">'+dopT+'</span>';
+            if(avtT)h+='<span style="padding:4px 12px;border-radius:6px;font-size:.8em;font-weight:700;background:'+avtB+';color:'+avtC+';">'+avtT+'</span>';
+            h+='</div><div class="stats-grid">';
             h+='<div class="stat-card"><div class="val c-green">'+done+'/'+total+'</div><div class="lbl">✅ Сдано</div></div>';
             h+='<div class="stat-card"><div class="val c-red">'+debts+'</div><div class="lbl">❌ Долги</div></div>';
             h+='<div class="stat-card"><div class="val c-blue">'+(avgAll||'—')+'</div><div class="lbl">📊 Средний балл</div></div>';
@@ -175,7 +150,6 @@
             h+='</div>';
             var pct=total?Math.round(done/total*100):0,fc=pct>=80?'fill-green':pct>=50?'fill-yellow':'fill-red';
             h+='<div style="margin:8px 0;font-size:.8em;">Прогресс: <b>'+pct+'%</b></div><div class="progress-bar"><div class="progress-fill '+fc+'" style="width:'+pct+'%"></div></div>';
-            
             var pzKeys=Object.keys(pz).sort(function(a,b){return parseInt(a.replace('ПЗ ',''))-parseInt(b.replace('ПЗ ',''));});
             var lrKeys=Object.keys(lr).sort(function(a,b){return parseInt(a.replace('ЛР ',''))-parseInt(b.replace('ЛР ',''));});
             h+='<div class="section-title">📝 Практические (ср: '+(avgPZ||'—')+')</div><div class="task-grid">';
@@ -187,8 +161,7 @@
         }
 
         function card(id,t){
-            var s=t?t.status||'':'',g=t?t.grade||'':'';
-            var has=g&&!isNaN(parseFloat(g))&&parseFloat(g)>0;
+            var s=t?t.status||'':'',g=t?t.grade||'':'',has=g&&!isNaN(parseFloat(g))&&parseFloat(g)>0;
             var isDone=has&&s!=='2',disp=isDone?g:'долг';
             var cls=isDone?('grade-'+(parseFloat(g)>=5?'5':parseFloat(g)>=4?'4':parseFloat(g)>=3?'3':'2')):'grade-2';
             var badge=isDone?'<span class="status-badge badge-done">✔</span>':'<span class="status-badge badge-fail">✘</span>';
