@@ -60,287 +60,214 @@
         loadData();
 
         function loadData() {
-            document.getElementById('mainContent').innerHTML = '<div style="text-align:center;padding:40px;">🔄 Загрузка...</div>';
+            var d = document.getElementById('mainContent');
+            d.innerHTML = '<div style="text-align:center;padding:40px;">🔄 Загрузка...</div>';
             
             var sheetId = SHEET_IDS[user.group] || SHEET_IDS['102'];
+            var search = user.name.toLowerCase().replace(/\s+/g, ' ').trim();
             
+            // Загружаем оба листа
             Promise.all([
                 fetch('https://docs.google.com/spreadsheets/d/' + sheetId + '/gviz/tq?tqx=out:json&sheet=ПЗ').then(function(r){return r.text();}),
                 fetch('https://docs.google.com/spreadsheets/d/' + sheetId + '/gviz/tq?tqx=out:json&sheet=ЛР').then(function(r){return r.text();}),
                 fetch('https://docs.google.com/spreadsheets/d/' + sheetId + '/gviz/tq?tqx=out:json&sheet=Допуск').then(function(r){return r.text();})
             ]).then(function(results) {
-                var pz = parseSheet(results[0], 'ПЗ');
-                var lr = parseSheet(results[1], 'ЛР');
+                var pzData = parseAll(results[0], search, 'ПЗ');
+                var lrData = parseAll(results[1], search, 'ЛР');
+                var dopData = parseDop(results[2], search);
                 
-                var search = user.name.toLowerCase().replace(/\s+/g, ' ').trim();
-                var pzRow = findRow(pz, search);
-                var lrRow = findRow(lr, search);
-                
-                if (!pzRow && !lrRow) {
-                    showError('Студент не найден');
+                if (!pzData.student && !lrData.student) {
+                    d.innerHTML = '<h2>📊 Мои оценки</h2><p class="text-muted">' + user.name + ' | Группа ' + user.group + '</p><p style="color:#dc2626;text-align:center;padding:20px;">Студент не найден</p>';
                     return;
                 }
                 
-                // Данные допуска
-                var dopText = '';
-                try {
-                    var dopJson = JSON.parse(results[2].substring(results[2].indexOf('{'), results[2].lastIndexOf('}') + 1));
-                    var dopRows = dopJson.table.rows;
-                    var dopRow = null;
-                    for (var i = 2; i < dopRows.length; i++) {
-                        var dc = dopRows[i].c;
-                        if (dc && dc[1]) {
-                            var dopFio = String(dc[1].v || '').trim();
-                            if (dopFio.toLowerCase().includes(search)) {
-                                dopRow = { cells: dc };
-                                break;
-                            }
-                        }
-                    }
-                    renderPage({ pz: pzRow, lr: lrRow, dop: dopRow });
-                } catch(e) {
-                    renderPage({ pz: pzRow, lr: lrRow, dop: null });
-                }
+                renderPage({
+                    pzTasks: pzData.tasks,
+                    lrTasks: lrData.tasks,
+                    pzHeaders: pzData.headers,
+                    lrHeaders: lrData.headers,
+                    dop: dopData
+                });
             }).catch(function(e) {
                 console.error(e);
-                showError('Ошибка загрузки');
+                d.innerHTML = '<h2>📊 Мои оценки</h2><p style="color:#dc2626;">Ошибка загрузки</p>';
             });
         }
 
-        function parseSheet(text) {
+        function parseAll(text, search, type) {
             var json = JSON.parse(text.substring(text.indexOf('{'), text.lastIndexOf('}') + 1));
             var rows = json.table.rows;
-            var students = [];
             
-            // Сохраняем заголовки из 2-й строки (индекс 1)
+            // Заголовки из строки 2 (индекс 1)
             var headers = [];
             if (rows[1] && rows[1].c) {
                 for (var i = 0; i < rows[1].c.length; i++) {
-                    headers[i] = rows[1].c[i] ? (rows[1].c[i].v || rows[1].c[i].f || '') : '';
+                    headers[i] = rows[1].c[i] ? String(rows[1].c[i].v || rows[1].c[i].f || '') : '';
                 }
             }
             
+            // Ищем студента
+            var studentCells = null;
             for (var i = 2; i < rows.length; i++) {
                 var cells = rows[i].c;
-                if (!cells) continue;
-                var fio = cells[3] ? String(cells[3].v || '').trim() : '';
-                if (!fio) continue;
-                students.push({ fio: fio, cells: cells, _headers: headers });
-            }
-            return students;
-        }
-
-        function findRow(students, search) {
-            for (var i = 0; i < students.length; i++) {
-                var name = students[i].fio.toLowerCase().replace(/\s+/g, ' ').trim();
-                if (name === search || name.includes(search) || search.includes(name)) {
-                    return students[i];
+                if (!cells || !cells[3]) continue;
+                var fio = String(cells[3].v || '').trim().toLowerCase().replace(/\s+/g, ' ');
+                if (fio === search || fio.includes(search) || search.includes(fio)) {
+                    studentCells = cells;
+                    break;
                 }
             }
+            
+            // Парсим задания: идём по заголовкам, находим номера
+            var tasks = {};
+            if (studentCells) {
+                var prevNum = 0;
+                for (var i = 4; i < headers.length - 3; i++) {
+                    var hdr = headers[i].trim();
+                    var match = hdr.match(/^(\d+)/);
+                    if (!match) continue;
+                    if (hdr.includes('Вх') || hdr.includes('тест') || hdr.includes('П/р') || hdr.includes('Excel') || hdr.includes('сред') || hdr.includes('проп') || hdr.includes('Осталось') || hdr.includes('Ссылка') || hdr.includes('Номер') || hdr.includes('Автом') || hdr.includes('Допуск')) continue;
+                    
+                    var num = parseInt(match[1]);
+                    if (num === prevNum) continue; // сдвоенный столбец
+                    prevNum = num;
+                    
+                    var taskId = (type === 'ПЗ' ? 'ПЗ ' : 'ЛР ') + num;
+                    
+                    // Проверяем следующую ячейку
+                    var nextHdr = (i + 1 < headers.length) ? headers[i + 1].trim() : '';
+                    var nextMatch = nextHdr.match(/^(\d+)/);
+                    
+                    if (nextMatch && !nextHdr.includes('Excel')) {
+                        // Только оценка
+                        tasks[taskId] = { status: '', grade: getV(studentCells[i]) };
+                    } else {
+                        // Статус + оценка
+                        tasks[taskId] = { status: getV(studentCells[i]), grade: getV(studentCells[i + 1]) };
+                    }
+                }
+            }
+            
+            return { student: studentCells, tasks: tasks, headers: headers };
+        }
+
+        function parseDop(text, search) {
+            try {
+                var json = JSON.parse(text.substring(text.indexOf('{'), text.lastIndexOf('}') + 1));
+                var rows = json.table.rows;
+                for (var i = 2; i < rows.length; i++) {
+                    var cells = rows[i].c;
+                    if (!cells || !cells[1]) continue;
+                    var fio = String(cells[1].v || '').trim().toLowerCase().replace(/\s+/g, ' ');
+                    if (fio === search || fio.includes(search) || search.includes(fio)) {
+                        return {
+                            dopusk: getV(cells[2]),
+                            avtomat: getV(cells[3])
+                        };
+                    }
+                }
+            } catch(e) {}
             return null;
         }
 
-        function getVal(cell) {
+        function getV(cell) {
             if (!cell) return '';
             var v = cell.v;
             if (v === null || v === undefined) v = cell.f || '';
             return String(v).trim();
         }
 
-        function extractTasks(row, type) {
-            var tasks = {};
-            if (!row || !row.cells) return tasks;
-            
-            var cells = row.cells;
-            var headers = row._headers || [];
-            
-            // Сначала собираем карту заголовков: [индекс, номер работы, заголовок]
-            var headerMap = [];
-            for (var i = 4; i < headers.length - 3; i++) {
-                var text = String(headers[i] || '').trim();
-                if (!text) continue;
-                
-                // Пропускаем явно не-работы
-                if (text.includes('сред') || text.includes('проп') || 
-                    text.includes('Осталось') || text.includes('Excel') ||
-                    text.includes('Ссылка') || text.includes('Вх') ||
-                    text.includes('тест') || text.includes('П/р') ||
-                    text.includes('Номер') || text.includes('Автом') ||
-                    text.includes('Допуск')) continue;
-                
-                var match = text.match(/^(\d+)/);
-                if (match) {
-                    headerMap.push({ index: i, number: match[1], header: text });
-                }
-            }
-            
-            // Теперь для каждого заголовка определяем статус и оценку
-            for (var j = 0; j < headerMap.length; j++) {
-                var current = headerMap[j];
-                var next = headerMap[j + 1];
-                
-                var taskId = (type === 'ПЗ' ? 'ПЗ ' : 'ЛР ') + current.number;
-                
-                // Если следующий заголовок сразу за текущим (индекс+1) — 
-                // значит у работы только одна ячейка (сразу оценка)
-                if (next && next.index === current.index + 1) {
-                    tasks[taskId] = { status: '', grade: getVal(cells[current.index]) };
-                }
-                // Если следующий заголовок через 2+ ячейки — 
-                // первая ячейка статус, вторая оценка
-                else {
-                    tasks[taskId] = {
-                        status: getVal(cells[current.index]),
-                        grade: getVal(cells[current.index + 1])
-                    };
-                }
-            }
-            
-            return tasks;
-        }
-
         function renderPage(data) {
-            var pzTasks = extractTasks(data.pz, 'ПЗ');
-            var lrTasks = extractTasks(data.lr, 'ЛР');
-            var pzAll = Object.values(pzTasks);
-            var lrAll = Object.values(lrTasks);
-            var allTasks = pzAll.concat(lrAll);
+            var pz = data.pzTasks;
+            var lr = data.lrTasks;
+            var all = {};
+            for (var k in pz) all[k] = pz[k];
+            for (var k in lr) all[k] = lr[k];
             
-            var done = allTasks.filter(function(t){ return t.grade && !isNaN(parseFloat(t.grade)) && parseFloat(t.grade) > 0 && t.status !== '2'; }).length;
-            var debts = allTasks.filter(function(t){ return t.status === '2' || t.status === 'н' || !t.grade || t.grade === '' || t.grade === '0'; }).length;
-            var total = allTasks.length;
+            var pzArr = Object.values(pz);
+            var lrArr = Object.values(lr);
+            var allArr = Object.values(all);
             
-            var pzGrades = []; pzAll.forEach(function(t){ if(t.grade && !isNaN(parseFloat(t.grade)) && parseFloat(t.grade)>0 && t.status!=='2') pzGrades.push(parseFloat(t.grade)); });
-            var lrGrades = []; lrAll.forEach(function(t){ if(t.grade && !isNaN(parseFloat(t.grade)) && parseFloat(t.grade)>0 && t.status!=='2') lrGrades.push(parseFloat(t.grade)); });
-            var allGrades = pzGrades.concat(lrGrades);
+            var done = allArr.filter(function(t){return t.grade&&!isNaN(parseFloat(t.grade))&&parseFloat(t.grade)>0&&t.status!=='2';}).length;
+            var debts = allArr.filter(function(t){return t.status==='2'||t.status==='н'||!t.grade||t.grade===''||t.grade==='0';}).length;
+            var total = allArr.length;
             
-            var avgPZ = pzGrades.length ? Math.round((pzGrades.reduce(function(a,b){return a+b},0)/pzGrades.length)*10)/10 : 0;
-            var avgLR = lrGrades.length ? Math.round((lrGrades.reduce(function(a,b){return a+b},0)/lrGrades.length)*10)/10 : 0;
-            var avgAll = allGrades.length ? Math.round((allGrades.reduce(function(a,b){return a+b},0)/allGrades.length)*10)/10 : 0;
-
-            // Данные из листа Допуск
-            var dopuskText = '—';
-            var dopuskColor = '#94a3b8';
-            var dopuskBg = '#f1f5f9';
-            var avtomatText = '—';
-            var avtomatColor = '#94a3b8';
-            var avtomatBg = '#f1f5f9';
+            var getAvg = function(arr){var g=arr.filter(function(t){return t.grade&&!isNaN(parseFloat(t.grade))&&parseFloat(t.grade)>0&&t.status!=='2';}).map(function(t){return parseFloat(t.grade);});return g.length?Math.round(g.reduce(function(a,b){return a+b},0)/g.length*10)/10:0;};
+            var avgPZ = getAvg(pzArr), avgLR = getAvg(lrArr), avgAll = getAvg(allArr);
             
-            if (data.dop && data.dop.cells) {
-                var dc = data.dop.cells;
-                var rawDopusk = getVal(dc[2]);
-                var rawAvtomat = getVal(dc[3]);
-                
-                if (rawDopusk === 'ДОП') {
-                    dopuskText = 'ДОПУЩЕН';
-                    dopuskColor = '#059669';
-                    dopuskBg = '#ecfdf5';
-                } else if (rawDopusk === 'НЕДОП') {
-                    dopuskText = 'НЕ ДОПУЩЕН';
-                    dopuskColor = '#dc2626';
-                    dopuskBg = '#fef2f2';
-                }
-                
-                if (rawAvtomat === 'да') {
-                    avtomatText = 'АВТОМАТ';
-                    avtomatColor = '#059669';
-                    avtomatBg = '#ecfdf5';
-                } else if (rawAvtomat === 'нет') {
-                    avtomatText = 'НЕТ АВТОМАТА';
-                    avtomatColor = '#dc2626';
-                    avtomatBg = '#fef2f2';
-                }
+            var dopText = '', dopColor = '#94a3b8', dopBg = '#f1f5f9';
+            var avtText = '', avtColor = '#94a3b8', avtBg = '#f1f5f9';
+            
+            if (data.dop) {
+                if (data.dop.dopusk === 'ДОП') { dopText = 'ДОПУЩЕН'; dopColor = '#059669'; dopBg = '#ecfdf5'; }
+                else if (data.dop.dopusk === 'НЕДОП') { dopText = 'НЕ ДОПУЩЕН'; dopColor = '#dc2626'; dopBg = '#fef2f2'; }
+                if (data.dop.avtomat === 'да') { avtText = 'АВТОМАТ'; avtColor = '#059669'; avtBg = '#ecfdf5'; }
+                else if (data.dop.avtomat === 'нет') { avtText = 'НЕТ АВТОМАТА'; avtColor = '#dc2626'; avtBg = '#fef2f2'; }
             }
 
             var h = '<h2>📊 Мои оценки</h2>';
-            
-            // Строка с ФИО, группой и плашками
             h += '<div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:16px;">';
-            h += '<span class="text-muted" style="font-size:0.95em;">' + user.name + ' | Группа ' + user.group + '</span>';
-            h += '<span style="padding:4px 12px;border-radius:6px;font-size:0.8em;font-weight:700;background:' + dopuskBg + ';color:' + dopuskColor + ';">' + dopuskText + '</span>';
-            h += '<span style="padding:4px 12px;border-radius:6px;font-size:0.8em;font-weight:700;background:' + avtomatBg + ';color:' + avtomatColor + ';">' + avtomatText + '</span>';
+            h += '<span class="text-muted">' + user.name + ' | Группа ' + user.group + '</span>';
+            if (dopText) h += '<span style="padding:4px 12px;border-radius:6px;font-size:.8em;font-weight:700;background:'+dopBg+';color:'+dopColor+';">'+dopText+'</span>';
+            if (avtText) h += '<span style="padding:4px 12px;border-radius:6px;font-size:.8em;font-weight:700;background:'+avtBg+';color:'+avtColor+';">'+avtText+'</span>';
             h += '</div>';
 
-            // Статистика
             h += '<div class="stats-grid">';
-            h += '<div class="stat-card"><div class="val c-green">' + done + '/' + total + '</div><div class="lbl">✅ Сдано работ</div></div>';
-            h += '<div class="stat-card"><div class="val c-red">' + debts + '</div><div class="lbl">❌ Долгов</div></div>';
-            h += '<div class="stat-card"><div class="val c-blue">' + (avgAll||'—') + '</div><div class="lbl">📊 Средний балл</div></div>';
-            h += '<div class="stat-card"><div class="val c-yellow">' + (avgPZ||'—') + ' / ' + (avgLR||'—') + '</div><div class="lbl">📝 ПЗ / 🔬 ЛР</div></div>';
+            h += '<div class="stat-card"><div class="val c-green">'+done+'/'+total+'</div><div class="lbl">✅ Сдано работ</div></div>';
+            h += '<div class="stat-card"><div class="val c-red">'+debts+'</div><div class="lbl">❌ Долгов</div></div>';
+            h += '<div class="stat-card"><div class="val c-blue">'+(avgAll||'—')+'</div><div class="lbl">📊 Средний балл</div></div>';
+            h += '<div class="stat-card"><div class="val c-yellow">'+(avgPZ||'—')+' / '+(avgLR||'—')+'</div><div class="lbl">📝 ПЗ / 🔬 ЛР</div></div>';
             h += '</div>';
 
-            // Прогресс-бар
             var pct = total ? Math.round(done/total*100) : 0;
             var fc = pct>=80?'fill-green':pct>=50?'fill-yellow':'fill-red';
-            h += '<div style="margin:8px 0;font-size:.8em;">Прогресс: <b>' + pct + '%</b> (' + done + ' из ' + total + ' сдано, ' + debts + ' долгов)</div>';
-            h += '<div class="progress-bar"><div class="progress-fill ' + fc + '" style="width:' + pct + '%"></div></div>';
+            h += '<div style="margin:8px 0;font-size:.8em;">Прогресс: <b>'+pct+'%</b></div>';
+            h += '<div class="progress-bar"><div class="progress-fill '+fc+'" style="width:'+pct+'%"></div></div>';
 
-            // ПЗ
-            h += '<div class="section-title">📝 Практические занятия (ср. балл: ' + (avgPZ||'—') + ')</div><div class="task-grid">';
-            ['ПЗ 1','ПЗ 2','ПЗ 3','ПЗ 5','ПЗ 6','ПЗ 7','ПЗ 8','ПЗ 9','ПЗ 10','ПЗ 11','ПЗ 12','ПЗ 13','ПЗ 14','ПЗ 15','ПЗ 16','ПЗ 17','ПЗ 18','ПЗ 19','ПЗ 20','ПЗ 21','ПЗ 24','ПЗ 25','ПЗ 27','ПЗ 28','ПЗ 29'].forEach(function(id){ if(pzTasks[id]!==undefined) h+=renderCard(id,pzTasks[id]); });
+            // Сортируем ПЗ по номеру
+            var pzKeys = Object.keys(pz).sort(function(a,b){return parseInt(a.replace('ПЗ ','')) - parseInt(b.replace('ПЗ ',''));});
+            var lrKeys = Object.keys(lr).sort(function(a,b){return parseInt(a.replace('ЛР ','')) - parseInt(b.replace('ЛР ',''));});
+
+            h += '<div class="section-title">📝 Практические занятия (ср. балл: '+(avgPZ||'—')+')</div><div class="task-grid">';
+            pzKeys.forEach(function(id){ h += card(id, pz[id]); });
             h += '</div>';
 
-            // ЛР
-            h += '<div class="section-title">🔬 Лабораторные работы (ср. балл: ' + (avgLR||'—') + ')</div><div class="task-grid">';
-            ['ЛР 1','ЛР 2','ЛР 3','ЛР 4','ЛР 5','ЛР 6','ЛР 7','ЛР 8','ЛР 9','ЛР 10','ЛР 11','ЛР 12','ЛР 13','ЛР 14','ЛР 15','ЛР 16'].forEach(function(id){ if(lrTasks[id]!==undefined) h+=renderCard(id,lrTasks[id]); });
+            h += '<div class="section-title">🔬 Лабораторные работы (ср. балл: '+(avgLR||'—')+')</div><div class="task-grid">';
+            lrKeys.forEach(function(id){ h += card(id, lr[id]); });
             h += '</div>';
 
             h += '<button class="btn btn-secondary btn-sm mt-2" onclick="loadData()">🔄 Обновить</button>';
             document.getElementById('mainContent').innerHTML = h;
         }
 
-        function renderCard(id, task) {
-            var status = task ? (task.status || '') : '';
-            var grade = task ? (task.grade || '') : '';
-            var hasGrade = grade && !isNaN(parseFloat(grade)) && parseFloat(grade) > 0;
+        function card(id, t) {
+            var s = t ? (t.status||'') : '';
+            var g = t ? (t.grade||'') : '';
+            var has = g && !isNaN(parseFloat(g)) && parseFloat(g) > 0;
+            var isDone = has && s !== '2';
+            var disp = isDone ? g : 'долг';
+            var cls = isDone ? ('grade-' + (parseFloat(g)>=5?'5':parseFloat(g)>=4?'4':parseFloat(g)>=3?'3':'2')) : 'grade-2';
+            var badge = isDone ? '<span class="status-badge badge-done">✔</span>' : '<span class="status-badge badge-fail">✘</span>';
             
-            var display = 'долг';
-            var cls = 'grade-2';
-            var badge = '<span class="status-badge badge-fail">✘</span>';
-            
-            // Пересдача: 2 в статусе + оценка => среднее арифметическое с округлением вверх
-            if (status === '2' && hasGrade) {
-                var avg = (2 + parseFloat(grade)) / 2;
-                avg = Math.ceil(avg * 2) / 2; // округляем до 0.5 вверх
-                if (avg === 2) avg = 2;
-                if (avg === 2.5) avg = 3;
-                if (avg === 3) avg = 3;
-                if (avg === 3.5) avg = 4;
-                if (avg === 4) avg = 4;
-                if (avg === 4.5) avg = 5;
-                display = avg;
-                if (avg >= 5) cls = 'grade-5';
-                else if (avg >= 4) cls = 'grade-4';
-                else if (avg >= 3) cls = 'grade-3';
-                else cls = 'grade-2';
+            // Пересдача: 2 + оценка
+            if (s === '2' && has) {
+                var avg = Math.ceil((2 + parseFloat(g)) / 2);
+                disp = avg;
+                cls = 'grade-' + (avg>=5?'5':avg>=4?'4':avg>=3?'3':'2');
                 badge = '<span class="status-badge badge-done">✔</span>';
             }
-            // Обычная сдача: есть оценка, нет "2"
-            else if (hasGrade && status !== '2' && status !== 'н') {
-                display = grade;
-                var g = parseFloat(grade);
-                if (g >= 5) cls = 'grade-5';
-                else if (g >= 4) cls = 'grade-4';
-                else if (g >= 3) cls = 'grade-3';
-                else cls = 'grade-2';
-                badge = '<span class="status-badge badge-done">✔</span>';
-            }
-            // "н" + оценка = сдал после пропуска
-            else if (status === 'н' && hasGrade) {
-                display = grade;
-                var g = parseFloat(grade);
-                if (g >= 5) cls = 'grade-5';
-                else if (g >= 4) cls = 'grade-4';
-                else if (g >= 3) cls = 'grade-3';
-                else cls = 'grade-2';
+            // н + оценка = сдал после пропуска
+            if (s === 'н' && has) {
+                disp = g;
+                cls = 'grade-' + (parseFloat(g)>=5?'5':parseFloat(g)>=4?'4':parseFloat(g)>=3?'3':'2');
                 badge = '<span class="status-badge badge-done">✔</span>';
             }
             
-            return '<div class="task-card"><h4>' + id + '</h4><div class="grade ' + cls + '">' + display + '</div>' + badge + '</div>';
+            return '<div class="task-card"><h4>'+id+'</h4><div class="grade '+cls+'">'+disp+'</div>'+badge+'</div>';
         }
 
         function showError(msg) {
-            document.getElementById('mainContent').innerHTML = '<h2>Мои оценки</h2><p class="text-muted">' + user.name + ' | Группа ' + user.group + '</p><div style="text-align:center;padding:40px;color:#dc2626;"><p>' + msg + '</p><button class="btn btn-primary mt-2" onclick="loadData()">Попробовать снова</button></div>';
+            document.getElementById('mainContent').innerHTML = '<h2>📊 Мои оценки</h2><p style="color:#dc2626;">'+msg+'</p>';
         }
 
         function doLogout() {
