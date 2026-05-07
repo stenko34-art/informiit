@@ -3,80 +3,46 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Личный кабинет — Информатика СПО</title>
+    <title>Мои оценки — Информатика СПО</title>
     <link rel="stylesheet" href="css/style.css">
     <style>
-        iframe{width:100%;height:calc(100vh - 140px);border:none;border-radius:8px}
-        .task-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-top:16px}
+        .task-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-top:16px}
         .task-card{
             border:2px solid #e2e8f0;
             border-radius:12px;
-            padding:14px;
+            padding:12px;
             text-align:center;
             background:white;
             transition:.2s;
-            cursor:pointer;
         }
-        .task-card:hover{box-shadow:0 4px 12px rgba(0,0,0,.1);transform:translateY(-2px)}
-        .task-card h4{font-size:.85em;margin-bottom:6px;color:#64748b}
-        .task-card .grade{font-size:2em;font-weight:700;margin:6px 0}
-        .grade-pass{color:#059669}
-        .grade-fail{color:#dc2626}
-        .grade-empty{color:#94a3b8}
-        .grade-good{color:#2563eb}
-        .status-badge{
-            display:inline-block;
-            padding:3px 8px;
-            border-radius:10px;
-            font-size:.7em;
-            font-weight:600;
-        }
+        .task-card h4{font-size:.8em;margin-bottom:4px;color:#64748b}
+        .task-card .grade{font-size:1.8em;font-weight:700;margin:4px 0}
+        .grade-5{color:#059669}.grade-4{color:#2563eb}.grade-3{color:#d97706}.grade-2{color:#dc2626}.grade-empty{color:#94a3b8}
+        .status-badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:.65em;font-weight:600}
         .badge-done{background:#ecfdf5;color:#065f46}
         .badge-fail{background:#fef2f2;color:#991b1b}
         .badge-pending{background:#f1f5f9;color:#475569}
         .badge-good{background:#eff6ff;color:#1e40af}
-        .loading-text{text-align:center;padding:40px;color:#94a3b8}
-        .from-sheets{font-size:.65em;color:#94a3b8;margin-top:4px}
-        .refresh-btn{margin-top:16px;text-align:center}
-        .summary{margin-bottom:16px;padding:12px;background:#f8fafc;border-radius:8px}
+        .summary{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}
+        .summary-card{background:#f8fafc;border-radius:10px;padding:12px;text-align:center}
+        .summary-card .num{font-size:2em;font-weight:700}
+        .summary-card .lbl{font-size:.75em;color:#64748b}
+        .num-green{color:#059669}.num-red{color:#dc2626}.num-blue{color:#2563eb}
     </style>
 </head>
 <body>
     <header class="header">
         <h1>📚 Информатика — СПО 1 курс</h1>
         <div class="user-block">
-            <span id="userName">Загрузка...</span>
+            <span id="userName"></span>
             <button class="btn btn-outline btn-sm" onclick="doLogout()">🚪 Выйти</button>
         </div>
     </header>
 
     <div class="container">
-        <nav class="sidebar">
-            <h3>📋 Навигация</h3>
-            <ul class="nav-list">
-                <li><a href="#" onclick="showProgress()" id="navProgress" class="active">📊 Мои оценки</a></li>
-                <li class="section-title">Лабораторные работы</li>
-                <li><a href="#" onclick="openPZ('lr1')">🔬 ЛР №1 — Браузер</a></li>
-                <li><a href="#" onclick="openPZ('lr2')">🔬 ЛР №2 — Поисковые системы</a></li>
-                <li><a href="#" onclick="openPZ('lr3')">🔬 ЛР №3 — Лицензионное ПО</a></li>
-                <li><a href="#" onclick="openPZ('lr4')">🔬 ЛР №4-5 — Атрибуты файлов</a></li>
-                <li><a href="#" onclick="openPZ('lr6')">🔬 ЛР №6 — Внешние устройства</a></li>
-                <li><a href="#" onclick="openPZ('lr7')">🔬 ЛР №7 — Создание публикаций</a></li>
-                <li class="section-title">Практические занятия</li>
-                <li><a href="#" onclick="openPZ('pz1')">📝 ПЗ №1 — Аппаратное обеспечение</a></li>
-                <li><a href="#" onclick="openPZ('pz2')">📝 ПЗ №2 — Файлы и папки</a></li>
-                <li><a href="#" onclick="openPZ('pz3')">📝 ПЗ №3 — Локальная сеть</a></li>
-                <li><a href="#" onclick="openPZ('pz5')">📝 ПЗ №5 — Интернет-сервисы</a></li>
-                <li><a href="#" onclick="openPZ('pz6')">📝 ПЗ №6 — Антивирус</a></li>
-                <li><a href="#" onclick="openPZ('pz7')">📝 ПЗ №7 — Архивация</a></li>
-                <li><a href="#" onclick="openPZ('pz8')">📝 ПЗ №8 — Дискретизация</a></li>
-            </ul>
-        </nav>
-
-        <main class="main-content" id="mainContent">
-            <div class="loading-text">
-                <p>🔄 Загрузка данных из Google Таблиц...</p>
-                <p style="font-size:.8em;">Группа: <span id="groupInfo"></span></p>
+        <main class="main-content" id="mainContent" style="width:100%;">
+            <div style="text-align:center;padding:40px;color:#94a3b8;">
+                🔄 Загрузка данных из Google Таблиц...
             </div>
         </main>
     </div>
@@ -84,153 +50,107 @@
     <script src="js/auth.js"></script>
     <script src="js/google-sheets.js"></script>
     <script>
-        // Проверка входа
         var user = checkAuth();
-        if (!user) {
-            window.location.href = 'index.html';
-        }
+        if (!user) window.location.href = 'index.html';
         
         document.getElementById('userName').textContent = user.name + ' (гр. ' + user.group + ')';
-        document.getElementById('groupInfo').textContent = user.group;
         
-        // Названия заданий
         var TASK_NAMES = {
-            'ЛР1': 'ЛР №1 — Браузер',
-            'ЛР2': 'ЛР №2 — Поисковые системы',
-            'ЛР3': 'ЛР №3 — Лицензионное ПО',
-            'ЛР4,5': 'ЛР №4-5 — Атрибуты файлов',
-            'ЛР6': 'ЛР №6 — Внешние устройства',
-            'ЛР7': 'ЛР №7 — Публикации',
-            'ПЗ1': 'ПЗ №1 — Аппаратное обеспечение',
-            'ПЗ2': 'ПЗ №2 — Файлы и папки',
-            'ПЗ3': 'ПЗ №3 — Локальная сеть',
-            'ПЗ5': 'ПЗ №5 — Интернет-сервисы',
-            'ПЗ6': 'ПЗ №6 — Антивирус',
-            'ПЗ7': 'ПЗ №7 — Архивация',
-            'ПЗ8': 'ПЗ №8 — Дискретизация'
+            'ЛР1':'ЛР №1', 'ЛР2':'ЛР №2', 'ЛР3':'ЛР №3', 'ЛР4,5':'ЛР №4-5',
+            'ЛР6':'ЛР №6', 'ЛР7':'ЛР №7', 'ПЗ1':'ПЗ №1', 'ПЗ2':'ПЗ №2',
+            'ПЗ3':'ПЗ №3', 'ПЗ5':'ПЗ №5', 'ПЗ6':'ПЗ №6', 'ПЗ7':'ПЗ №7', 'ПЗ8':'ПЗ №8'
         };
         
-        var sheetStudent = null; // Данные студента из Google Sheets
+        loadData();
         
-        // Загружаем данные при открытии
-        loadSheetData();
-        
-        function loadSheetData() {
-            showLoading();
-            
+        function loadData() {
             GoogleSheets.getStudentSheetData(user.name, user.group).then(function(student) {
-                sheetStudent = student;
-                showProgress();
+                if (student) {
+                    user.sheetData = student;
+                    sessionStorage.setItem('currentUser', JSON.stringify(user));
+                }
+                renderPage(student);
             }).catch(function() {
-                sheetStudent = null;
-                showProgress();
+                renderPage(null);
             });
         }
         
-        function showLoading() {
-            document.getElementById('mainContent').innerHTML = 
-                '<div class="loading-text">🔄 Загрузка данных из Google Таблиц...</div>';
-        }
-        
-        function showProgress() {
-            document.querySelectorAll('.nav-list a').forEach(function(a){a.classList.remove('active')});
-            document.getElementById('navProgress').classList.add('active');
-            
-            var h = '<h2>📊 Мои оценки</h2>';
-            h += '<p class="text-muted">Студент: <b>' + user.name + '</b> | Группа: <b>' + user.group + '</b></p>';
-            
-            if (!sheetStudent) {
-                h += '<div style="text-align:center;padding:40px;color:#94a3b8;">';
-                h += '<p>❌ Не удалось загрузить данные из Google Таблиц</p>';
-                h += '<p style="font-size:.8em;">Проверьте, что таблица опубликована (Файл → Опубликовать в интернете)</p>';
-                h += '<button class="btn btn-primary mt-2" onclick="loadSheetData()">🔄 Попробовать снова</button>';
-                h += '</div>';
-                document.getElementById('mainContent').innerHTML = h;
+        function renderPage(student) {
+            if (!student) {
+                document.getElementById('mainContent').innerHTML = 
+                    '<h2>📊 Мои оценки</h2>' +
+                    '<div style="text-align:center;padding:40px;">' +
+                    '<p style="color:#dc2626;">❌ Не удалось загрузить данные</p>' +
+                    '<button class="btn btn-primary mt-2" onclick="loadData()">🔄 Попробовать снова</button>' +
+                    '</div>';
                 return;
             }
             
-            // Считаем статистику
-            var totalTasks = GoogleSheets.TASK_ORDER.length;
-            var doneTasks = 0;
-            var failedTasks = 0;
+            var tasks = GoogleSheets.TASK_ORDER;
+            var done = 0, failed = 0, total = tasks.length;
             
-            GoogleSheets.TASK_ORDER.forEach(function(taskId) {
-                var task = sheetStudent.tasks[taskId];
-                if (task && task.grade && task.status !== '2') {
-                    doneTasks++;
-                } else if (task && task.status === '2') {
-                    failedTasks++;
-                }
+            tasks.forEach(function(tid) {
+                var t = student.tasks[tid];
+                if (t && t.grade && t.status !== '2') done++;
+                if (t && t.status === '2' && !t.grade) failed++;
             });
+            
+            var h = '<h2>📊 Мои оценки</h2>';
+            h += '<p class="text-muted">' + user.name + ' | Группа ' + user.group + '</p>';
             
             // Сводка
             h += '<div class="summary">';
-            h += '✅ Сдано: <b>' + doneTasks + '</b> | ';
-            h += '❌ Долги: <b>' + failedTasks + '</b> | ';
-            h += '📋 Всего: <b>' + totalTasks + '</b>';
+            h += '<div class="summary-card"><div class="num num-green">' + done + '</div><div class="lbl">✅ Сдано</div></div>';
+            h += '<div class="summary-card"><div class="num num-red">' + failed + '</div><div class="lbl">❌ Долги</div></div>';
+            h += '<div class="summary-card"><div class="num num-blue">' + total + '</div><div class="lbl">📋 Всего</div></div>';
             h += '</div>';
             
-            // Карточки заданий
+            // Карточки
             h += '<div class="task-grid">';
-            
-            GoogleSheets.TASK_ORDER.forEach(function(taskId) {
-                var task = sheetStudent.tasks[taskId];
-                var status = task ? task.status : '';
-                var grade = task ? task.grade : '';
-                var name = TASK_NAMES[taskId] || taskId;
+            tasks.forEach(function(tid) {
+                var t = student.tasks[tid];
+                var status = t ? t.status : '';
+                var grade = t ? t.grade : '';
                 
-                var gradeDisplay = '—';
-                var gradeClass = 'grade-empty';
-                var badgeHtml = '';
+                var display = '—';
+                var cls = 'grade-empty';
+                var badge = '<span class="status-badge badge-pending">Ожидает</span>';
                 
                 if (grade && status !== '2') {
-                    // Сдано с оценкой
-                    gradeDisplay = grade;
-                    if (grade === '5' || grade === '4') gradeClass = 'grade-good';
-                    else if (grade === '3') gradeClass = 'grade-pass';
-                    else gradeClass = 'grade-pass';
-                    badgeHtml = '<span class="status-badge badge-done">Сдано</span>';
+                    display = grade;
+                    cls = 'grade-' + grade;
+                    badge = '<span class="status-badge badge-done">Сдано</span>';
                 } else if (status === '2' && !grade) {
-                    // Не сдано (долг)
-                    gradeDisplay = '2';
-                    gradeClass = 'grade-fail';
-                    badgeHtml = '<span class="status-badge badge-fail">Долг</span>';
+                    display = '2';
+                    cls = 'grade-2';
+                    badge = '<span class="status-badge badge-fail">Долг</span>';
                 } else if (status === '2' && grade) {
-                    // Пересдача
-                    gradeDisplay = grade;
-                    gradeClass = 'grade-fail';
-                    badgeHtml = '<span class="status-badge badge-fail">Пересдача</span>';
-                } else if (status === 'н' || grade) {
-                    // Зачтено
-                    gradeDisplay = grade || '✓';
-                    gradeClass = 'grade-pass';
-                    badgeHtml = '<span class="status-badge badge-done">Зачтено</span>';
-                } else {
-                    badgeHtml = '<span class="status-badge badge-pending">Ожидает</span>';
+                    display = grade;
+                    cls = 'grade-2';
+                    badge = '<span class="status-badge badge-fail">Пересдача</span>';
+                } else if (grade) {
+                    display = grade;
+                    cls = 'grade-' + grade;
+                    badge = '<span class="status-badge badge-done">Зачтено</span>';
+                } else if (status === 'н') {
+                    display = '✓';
+                    cls = 'grade-5';
+                    badge = '<span class="status-badge badge-good">Зачёт</span>';
                 }
                 
                 h += '<div class="task-card">';
-                h += '<h4>' + name + '</h4>';
-                h += '<div class="grade ' + gradeClass + '">' + gradeDisplay + '</div>';
-                h += badgeHtml;
-                h += '<p class="from-sheets">из Google Таблиц</p>';
+                h += '<h4>' + (TASK_NAMES[tid] || tid) + '</h4>';
+                h += '<div class="grade ' + cls + '">' + display + '</div>';
+                h += badge;
                 h += '</div>';
             });
-            
             h += '</div>';
             
-            // Кнопка обновления
-            h += '<div class="refresh-btn">';
-            h += '<button class="btn btn-secondary" onclick="loadSheetData()">🔄 Обновить данные из таблиц</button>';
+            h += '<div style="text-align:center;margin-top:16px;">';
+            h += '<button class="btn btn-secondary btn-sm" onclick="loadData()">🔄 Обновить</button>';
             h += '</div>';
             
             document.getElementById('mainContent').innerHTML = h;
-        }
-        
-        function openPZ(taskId) {
-            document.getElementById('mainContent').innerHTML = 
-                '<p class="text-muted mb-2">📝 ' + (TASK_NAMES[taskId] || taskId) + '</p>' +
-                '<p style="color:#94a3b8;text-align:center;padding:40px;">Интерактивное задание в разработке</p>';
         }
         
         function doLogout() {
