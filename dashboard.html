@@ -60,7 +60,7 @@
         loadData();
 
         function loadData() {
-            document.getElementById('mainContent').innerHTML = '<div style="text-align:center;padding:40px;">🔄 Загрузка данных из Google Таблиц...</div>';
+            document.getElementById('mainContent').innerHTML = '<div style="text-align:center;padding:40px;">🔄 Загрузка...</div>';
             
             var sheetId = SHEET_IDS[user.group] || SHEET_IDS['102'];
             
@@ -69,24 +69,41 @@
                 fetch('https://docs.google.com/spreadsheets/d/' + sheetId + '/gviz/tq?tqx=out:json&sheet=ЛР').then(function(r){return r.text();}),
                 fetch('https://docs.google.com/spreadsheets/d/' + sheetId + '/gviz/tq?tqx=out:json&sheet=Допуск').then(function(r){return r.text();})
             ]).then(function(results) {
-                var pz = parseSheet(results[0]);
-                var lr = parseSheet(results[1]);
-                var dop = parseSheet(results[2]);
+                var pz = parseSheet(results[0], 'ПЗ');
+                var lr = parseSheet(results[1], 'ЛР');
                 
                 var search = user.name.toLowerCase().replace(/\s+/g, ' ').trim();
                 var pzRow = findRow(pz, search);
                 var lrRow = findRow(lr, search);
-                var dopRow = findRow(dop, search);
                 
                 if (!pzRow && !lrRow) {
-                    showError('Студент не найден в таблице группы ' + user.group);
+                    showError('Студент не найден');
                     return;
                 }
                 
-                renderPage({ pz: pzRow, lr: lrRow, dop: dopRow });
+                // Данные допуска
+                var dopText = '';
+                try {
+                    var dopJson = JSON.parse(results[2].substring(results[2].indexOf('{'), results[2].lastIndexOf('}') + 1));
+                    var dopRows = dopJson.table.rows;
+                    var dopRow = null;
+                    for (var i = 2; i < dopRows.length; i++) {
+                        var dc = dopRows[i].c;
+                        if (dc && dc[1]) {
+                            var dopFio = String(dc[1].v || '').trim();
+                            if (dopFio.toLowerCase().includes(search)) {
+                                dopRow = { cells: dc };
+                                break;
+                            }
+                        }
+                    }
+                    renderPage({ pz: pzRow, lr: lrRow, dop: dopRow });
+                } catch(e) {
+                    renderPage({ pz: pzRow, lr: lrRow, dop: null });
+                }
             }).catch(function(e) {
                 console.error(e);
-                showError('Ошибка загрузки данных');
+                showError('Ошибка загрузки');
             });
         }
 
@@ -94,12 +111,21 @@
             var json = JSON.parse(text.substring(text.indexOf('{'), text.lastIndexOf('}') + 1));
             var rows = json.table.rows;
             var students = [];
+            
+            // Сохраняем заголовки из 2-й строки (индекс 1)
+            var headers = [];
+            if (rows[1] && rows[1].c) {
+                for (var i = 0; i < rows[1].c.length; i++) {
+                    headers[i] = rows[1].c[i] ? (rows[1].c[i].v || rows[1].c[i].f || '') : '';
+                }
+            }
+            
             for (var i = 2; i < rows.length; i++) {
                 var cells = rows[i].c;
                 if (!cells) continue;
                 var fio = cells[3] ? String(cells[3].v || '').trim() : '';
                 if (!fio) continue;
-                students.push({ fio: fio, cells: cells });
+                students.push({ fio: fio, cells: cells, _headers: headers });
             }
             return students;
         }
@@ -123,22 +149,47 @@
 
         function extractTasks(row, type) {
             var tasks = {};
-            if (!row) return tasks;
+            if (!row || !row.cells) return tasks;
+            
             var cells = row.cells;
             
-            if (type === 'ПЗ') {
-                var cols = [6,8,10,12,14,16,18,20,22,24,26,28,30,32,34,36,38,40,42,44,46,48,50,52,54];
-                var names = ['ПЗ 1','ПЗ 2','ПЗ 3','ПЗ 5','ПЗ 6','ПЗ 7','ПЗ 8','ПЗ 9','ПЗ 10','ПЗ 11','ПЗ 12','ПЗ 13','ПЗ 14','ПЗ 15','ПЗ 16','ПЗ 17','ПЗ 18','ПЗ 19','ПЗ 20','ПЗ 21','ПЗ 24','ПЗ 25','ПЗ 27','ПЗ 28','ПЗ 29'];
-                for (var i = 0; i < cols.length; i++) {
-                    tasks[names[i]] = { status: getVal(cells[cols[i]]), grade: getVal(cells[cols[i] + 1]) };
-                }
-            } else {
-                var cols = [4,6,8,10,12,14,16,18,20,22,24,26,28,30,32,34];
-                var names = ['ЛР 1','ЛР 2','ЛР 3','ЛР 4','ЛР 5','ЛР 6','ЛР 7','ЛР 8','ЛР 9','ЛР 10','ЛР 11','ЛР 12','ЛР 13','ЛР 14','ЛР 15','ЛР 16'];
-                for (var i = 0; i < cols.length; i++) {
-                    tasks[names[i]] = { status: getVal(cells[cols[i]]), grade: getVal(cells[cols[i] + 1]) };
+            // Заголовки из 2-й строки (индекс 1 в JSON)
+            var headers = row._headers || [];
+            
+            // Проходим по всем ячейкам, начиная с колонки E (индекс 4)
+            for (var i = 4; i < cells.length - 3; i++) {
+                var headerCell = headers[i];
+                if (!headerCell) continue;
+                
+                var headerText = String(headerCell).trim();
+                
+                // Ищем номера ПЗ/ЛР в заголовке
+                // Форматы: "1\n23.09", "2\n26.09", "5\n1.11", "19\n11" и т.д.
+                var match = headerText.match(/^(\d+)/);
+                if (!match) continue;
+                
+                var number = match[1];
+                var taskId = (type === 'ПЗ' ? 'ПЗ ' : 'ЛР ') + number;
+                
+                // Проверяем, что это действительно номер работы, а не что-то другое
+                // Пропускаем "Вх кон", "тест с.с." и т.д.
+                if (headerText.includes('Вх') || headerText.includes('тест') || headerText.includes('П/р') || headerText.includes('Excel')) continue;
+                
+                // Берём значение из текущей ячейки (статус) и следующей (оценка)
+                var statusVal = getVal(cells[i]);
+                var gradeVal = getVal(cells[i + 1]);
+                
+                // Проверяем, что следующая ячейка — это оценка, а не новый заголовок
+                var nextHeader = headers[i + 1];
+                if (nextHeader && String(nextHeader).trim().match(/^\d+/)) {
+                    // Следующая ячейка — начало новой работы, значит у этой только статус
+                    tasks[taskId] = { status: statusVal, grade: '' };
+                } else {
+                    tasks[taskId] = { status: statusVal, grade: gradeVal };
+                    i++; // Пропускаем ячейку с оценкой
                 }
             }
+            
             return tasks;
         }
 
