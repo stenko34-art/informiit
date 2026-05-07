@@ -161,38 +161,74 @@
             var avgLR = lrGrades.length ? Math.round((lrGrades.reduce(function(a,b){return a+b},0)/lrGrades.length)*10)/10 : 0;
             var avgAll = allGrades.length ? Math.round((allGrades.reduce(function(a,b){return a+b},0)/allGrades.length)*10)/10 : 0;
 
-            var dopText = '';
+            // Данные из листа Допуск
+            var dopuskText = '—';
+            var dopuskColor = '#94a3b8';
+            var dopuskBg = '#f1f5f9';
+            var avtomatText = '—';
+            var avtomatColor = '#94a3b8';
+            var avtomatBg = '#f1f5f9';
+            
             if (data.dop && data.dop.cells) {
                 var dc = data.dop.cells;
-                var dopusk = getVal(dc[2]) || '—';
-                var avtomat = getVal(dc[3]) || '—';
-                dopText = dopusk + ' | Автомат: ' + avtomat;
+                var rawDopusk = getVal(dc[2]);
+                var rawAvtomat = getVal(dc[3]);
+                
+                if (rawDopusk === 'ДОП') {
+                    dopuskText = 'ДОПУЩЕН';
+                    dopuskColor = '#059669';
+                    dopuskBg = '#ecfdf5';
+                } else if (rawDopusk === 'НЕДОП') {
+                    dopuskText = 'НЕ ДОПУЩЕН';
+                    dopuskColor = '#dc2626';
+                    dopuskBg = '#fef2f2';
+                }
+                
+                if (rawAvtomat === 'да') {
+                    avtomatText = 'АВТОМАТ';
+                    avtomatColor = '#059669';
+                    avtomatBg = '#ecfdf5';
+                } else if (rawAvtomat === 'нет') {
+                    avtomatText = 'НЕТ АВТОМАТА';
+                    avtomatColor = '#dc2626';
+                    avtomatBg = '#fef2f2';
+                }
             }
 
-            var h = '<h2>Мои оценки</h2>';
-            h += '<p class="text-muted">' + user.name + ' | Группа ' + user.group + '</p>';
-            h += '<div class="stats-grid">';
-            h += '<div class="stat-card"><div class="val c-green">' + done + '/' + total + '</div><div class="lbl">Сдано работ</div></div>';
-            h += '<div class="stat-card"><div class="val c-red">' + debts + '</div><div class="lbl">Долгов</div></div>';
-            h += '<div class="stat-card"><div class="val c-blue">' + (avgAll||'—') + '</div><div class="lbl">Средний балл</div></div>';
-            h += '<div class="stat-card"><div class="val c-yellow">' + (avgPZ||'—') + ' / ' + (avgLR||'—') + '</div><div class="lbl">ПЗ / ЛР</div></div>';
-            if (dopText) h += '<div class="stat-card"><div class="val" style="font-size:1.2em;color:#6366f1;">' + dopText + '</div><div class="lbl">Допуск</div></div>';
+            var h = '<h2>📊 Мои оценки</h2>';
+            
+            // Строка с ФИО, группой и плашками
+            h += '<div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:16px;">';
+            h += '<span class="text-muted" style="font-size:0.95em;">' + user.name + ' | Группа ' + user.group + '</span>';
+            h += '<span style="padding:4px 12px;border-radius:6px;font-size:0.8em;font-weight:700;background:' + dopuskBg + ';color:' + dopuskColor + ';">' + dopuskText + '</span>';
+            h += '<span style="padding:4px 12px;border-radius:6px;font-size:0.8em;font-weight:700;background:' + avtomatBg + ';color:' + avtomatColor + ';">' + avtomatText + '</span>';
             h += '</div>';
 
+            // Статистика
+            h += '<div class="stats-grid">';
+            h += '<div class="stat-card"><div class="val c-green">' + done + '/' + total + '</div><div class="lbl">✅ Сдано работ</div></div>';
+            h += '<div class="stat-card"><div class="val c-red">' + debts + '</div><div class="lbl">❌ Долгов</div></div>';
+            h += '<div class="stat-card"><div class="val c-blue">' + (avgAll||'—') + '</div><div class="lbl">📊 Средний балл</div></div>';
+            h += '<div class="stat-card"><div class="val c-yellow">' + (avgPZ||'—') + ' / ' + (avgLR||'—') + '</div><div class="lbl">📝 ПЗ / 🔬 ЛР</div></div>';
+            h += '</div>';
+
+            // Прогресс-бар
             var pct = total ? Math.round(done/total*100) : 0;
             var fc = pct>=80?'fill-green':pct>=50?'fill-yellow':'fill-red';
             h += '<div style="margin:8px 0;font-size:.8em;">Прогресс: <b>' + pct + '%</b> (' + done + ' из ' + total + ' сдано, ' + debts + ' долгов)</div>';
             h += '<div class="progress-bar"><div class="progress-fill ' + fc + '" style="width:' + pct + '%"></div></div>';
 
-            h += '<div class="section-title">Практические занятия (ср. балл: ' + (avgPZ||'—') + ')</div><div class="task-grid">';
+            // ПЗ
+            h += '<div class="section-title">📝 Практические занятия (ср. балл: ' + (avgPZ||'—') + ')</div><div class="task-grid">';
             ['ПЗ 1','ПЗ 2','ПЗ 3','ПЗ 5','ПЗ 6','ПЗ 7','ПЗ 8','ПЗ 9','ПЗ 10','ПЗ 11','ПЗ 12','ПЗ 13','ПЗ 14','ПЗ 15','ПЗ 16','ПЗ 17','ПЗ 18','ПЗ 19','ПЗ 20','ПЗ 21','ПЗ 24','ПЗ 25','ПЗ 27','ПЗ 28','ПЗ 29'].forEach(function(id){ if(pzTasks[id]!==undefined) h+=renderCard(id,pzTasks[id]); });
             h += '</div>';
 
-            h += '<div class="section-title">Лабораторные работы (ср. балл: ' + (avgLR||'—') + ')</div><div class="task-grid">';
+            // ЛР
+            h += '<div class="section-title">🔬 Лабораторные работы (ср. балл: ' + (avgLR||'—') + ')</div><div class="task-grid">';
             ['ЛР 1','ЛР 2','ЛР 3','ЛР 4','ЛР 5','ЛР 6','ЛР 7','ЛР 8','ЛР 9','ЛР 10','ЛР 11','ЛР 12','ЛР 13','ЛР 14','ЛР 15','ЛР 16'].forEach(function(id){ if(lrTasks[id]!==undefined) h+=renderCard(id,lrTasks[id]); });
             h += '</div>';
 
-            h += '<button class="btn btn-secondary btn-sm mt-2" onclick="loadData()">Обновить</button>';
+            h += '<button class="btn btn-secondary btn-sm mt-2" onclick="loadData()">🔄 Обновить</button>';
             document.getElementById('mainContent').innerHTML = h;
         }
 
