@@ -45,6 +45,8 @@
             var json=JSON.parse(text.substring(text.indexOf('{'),text.lastIndexOf('}')+1));
             var rows=json.table.rows;
             var tasks={};
+            
+            // Ищем студента
             var cells=null;
             for(var i=2;i<rows.length;i++){
                 var c=rows[i].c;if(!c||!c[3])continue;
@@ -53,31 +55,41 @@
             }
             if(!cells)return{tasks:{}};
             
-            // ЕДИНАЯ КАРТА: заголовки из 2-й строки
+            // Заголовки из строки 2 (индекс 1)
             var headers=rows[1].c;
             var prevNum=0;
-            var startCol=type==='ПЗ'?6:4; // ПЗ с G(6), ЛР с E(4)
             
-            for(var j=startCol;j<headers.length-3;j++){
+            // Начинаем с колонки E (индекс 4)
+            for(var j=4;j<headers.length-3;j++){
                 var hdr=getV(headers[j]);
                 if(!hdr)continue;
+                
+                // Пропускаем служебные
                 var l=hdr.toLowerCase();
                 if(l.includes('вх')||l.includes('тест')||l.includes('п/р')||l.includes('excel')||
                    l.includes('сред')||l.includes('проп')||l.includes('осталось')||l.includes('ссылка')||
                    l.includes('номер')||l.includes('автом')||l.includes('допуск')||l.includes('с.с.')||
-                   l.includes('с.у.')||l.includes('д/з')||l==='до')continue;
+                   l.includes('с.у.')||l.includes('д/з')||l==='до'||l.includes('студент'))continue;
+                
                 var match=hdr.match(/^(\d+)/);
                 if(!match)continue;
+                
                 var num=parseInt(match[1]);
                 if(num===prevNum)continue;
                 prevNum=num;
-                var tid=(type==='ПЗ'?'ПЗ ':'ЛР ')+num;
-                var nextHdr=getV(headers[j+1]);
+                
+                var taskId=(type==='ПЗ'?'ПЗ ':'ЛР ')+num;
+                
+                // Проверяем следующую ячейку
+                var nextHdr=j+1<headers.length?getV(headers[j+1]):'';
                 var nextMatch=nextHdr.match(/^(\d+)/);
-                if(nextMatch&&!nextHdr.toLowerCase().includes('excel')){
-                    tasks[tid]={status:'',grade:getV(cells[j])};
+                
+                if(nextMatch && !nextHdr.toLowerCase().includes('excel')){
+                    // Только одна ячейка (сразу оценка)
+                    tasks[taskId]={status:'',grade:getV(cells[j])};
                 }else{
-                    tasks[tid]={status:getV(cells[j]),grade:getV(cells[j+1])};
+                    // Две ячейки (статус + оценка)
+                    tasks[taskId]={status:getV(cells[j]),grade:getV(cells[j+1])};
                 }
             }
             return{tasks:tasks};
@@ -101,6 +113,7 @@
             d.innerHTML='<div style="text-align:center;padding:40px;">🔄 Загрузка...</div>';
             var sid=SHEET_IDS[user.group]||SHEET_IDS['102'];
             var search=user.name.toLowerCase().replace(/\s+/g,' ').trim();
+            
             Promise.all([
                 fetch('https://docs.google.com/spreadsheets/d/'+sid+'/gviz/tq?tqx=out:json&sheet=ПЗ').then(function(r){return r.text();}),
                 fetch('https://docs.google.com/spreadsheets/d/'+sid+'/gviz/tq?tqx=out:json&sheet=ЛР').then(function(r){return r.text();}),
@@ -110,7 +123,7 @@
                 var lr=parseSheet(results[1],search,'ЛР');
                 var dop=parseDop(results[2],search);
                 renderPage(pz.tasks,lr.tasks,dop);
-            }).catch(function(e){console.error(e);d.innerHTML='<h2>📊 Мои оценки</h2><p style="color:#dc2626;">Ошибка</p>';});
+            }).catch(function(e){console.error(e);d.innerHTML='<h2>📊 Мои оценки</h2><p style="color:#dc2626;">Ошибка загрузки</p>';});
         }
 
         function renderPage(pz,lr,dop){
@@ -121,30 +134,46 @@
             var total=allArr.length;
             var getAvg=function(arr){var g=arr.filter(function(t){return t.grade&&!isNaN(parseFloat(t.grade))&&parseFloat(t.grade)>0&&t.status!=='2';}).map(function(t){return parseFloat(t.grade);});return g.length?Math.round(g.reduce(function(a,b){return a+b},0)/g.length*10)/10:0;};
             var avgPZ=getAvg(pzArr),avgLR=getAvg(lrArr),avgAll=getAvg(allArr);
-            var dopT='',dopC='#94a3b8',dopB='#f1f5f9',avtT='',avtC='#94a3b8',avtB='#f1f5f9';
-            if(dop){
-                if(dop.dopusk==='ДОП'){dopT='ДОПУЩЕН';dopC='#059669';dopB='#ecfdf5';}else if(dop.dopusk==='НЕДОП'){dopT='НЕ ДОПУЩЕН';dopC='#dc2626';dopB='#fef2f2';}
-                if(dop.avtomat==='да'){avtT='АВТОМАТ';avtC='#059669';avtB='#ecfdf5';}else if(dop.avtomat==='нет'){avtT='НЕТ АВТОМАТА';avtC='#dc2626';avtB='#fef2f2';}
-            }
+            
             var h='<h2>📊 Мои оценки</h2>';
-            h+='<div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:16px;">';
-            h+='<span class="text-muted">'+user.name+' | Группа '+user.group+'</span>';
-            if(dopT)h+='<span style="padding:4px 12px;border-radius:6px;font-size:.8em;font-weight:700;background:'+dopB+';color:'+dopC+';">'+dopT+'</span>';
-            if(avtT)h+='<span style="padding:4px 12px;border-radius:6px;font-size:.8em;font-weight:700;background:'+avtB+';color:'+avtC+';">'+avtT+'</span>';
-            h+='</div><div class="stats-grid">';
+            h+='<p class="text-muted">'+user.name+' | Группа '+user.group+'</p>';
+            
+            // Допуск
+            if(dop){
+                var dt='',dc='',db='',at='',ac='',ab='';
+                if(dop.dopusk==='ДОП'){dt='ДОПУЩЕН';dc='#059669';db='#ecfdf5';}
+                else if(dop.dopusk==='НЕДОП'){dt='НЕ ДОПУЩЕН';dc='#dc2626';db='#fef2f2';}
+                if(dop.avtomat==='да'){at='АВТОМАТ';ac='#059669';ab='#ecfdf5';}
+                else if(dop.avtomat==='нет'){at='НЕТ АВТОМАТА';ac='#dc2626';ab='#fef2f2';}
+                if(dt)h+='<span style="display:inline-block;padding:4px 12px;border-radius:6px;font-size:.8em;font-weight:700;background:'+db+';color:'+dc+';margin-right:8px;">'+dt+'</span>';
+                if(at)h+='<span style="display:inline-block;padding:4px 12px;border-radius:6px;font-size:.8em;font-weight:700;background:'+ab+';color:'+ac+';margin-right:8px;">'+at+'</span>';
+                h+='<br><br>';
+            }
+            
+            h+='<div class="stats-grid">';
             h+='<div class="stat-card"><div class="val c-green">'+done+'/'+total+'</div><div class="lbl">✅ Сдано</div></div>';
             h+='<div class="stat-card"><div class="val c-red">'+debts+'</div><div class="lbl">❌ Долги</div></div>';
             h+='<div class="stat-card"><div class="val c-blue">'+(avgAll||'—')+'</div><div class="lbl">📊 Средний балл</div></div>';
             h+='<div class="stat-card"><div class="val c-yellow">'+(avgPZ||'—')+' / '+(avgLR||'—')+'</div><div class="lbl">📝 ПЗ / 🔬 ЛР</div></div>';
             h+='</div>';
+            
+            // Прогресс
             var pct=total?Math.round(done/total*100):0,fc=pct>=80?'fill-green':pct>=50?'fill-yellow':'fill-red';
-            h+='<div style="margin:8px 0;font-size:.8em;">Прогресс: <b>'+pct+'%</b></div><div class="progress-bar"><div class="progress-fill '+fc+'" style="width:'+pct+'%"></div></div>';
+            h+='<div style="margin:8px 0;font-size:.8em;">Прогресс: <b>'+pct+'%</b> ('+done+' из '+total+' сдано, '+debts+' долгов)</div>';
+            h+='<div class="progress-bar"><div class="progress-fill '+fc+'" style="width:'+pct+'%"></div></div>';
+            
+            // ПЗ
             var pzKeys=Object.keys(pz).sort(function(a,b){return parseInt(a.replace('ПЗ ',''))-parseInt(b.replace('ПЗ ',''));});
+            h+='<div class="section-title">📝 Практические занятия (ср. балл: '+(avgPZ||'—')+')</div><div class="task-grid">';
+            pzKeys.forEach(function(id){h+=card(id,pz[id]);});
+            h+='</div>';
+            
+            // ЛР
             var lrKeys=Object.keys(lr).sort(function(a,b){return parseInt(a.replace('ЛР ',''))-parseInt(b.replace('ЛР ',''));});
-            h+='<div class="section-title">📝 Практические (ср: '+(avgPZ||'—')+')</div><div class="task-grid">';
-            pzKeys.forEach(function(id){h+=card(id,pz[id]);});h+='</div>';
-            h+='<div class="section-title">🔬 Лабораторные (ср: '+(avgLR||'—')+')</div><div class="task-grid">';
-            lrKeys.forEach(function(id){h+=card(id,lr[id]);});h+='</div>';
+            h+='<div class="section-title">🔬 Лабораторные работы (ср. балл: '+(avgLR||'—')+')</div><div class="task-grid">';
+            lrKeys.forEach(function(id){h+=card(id,lr[id]);});
+            h+='</div>';
+            
             h+='<button class="btn btn-secondary btn-sm mt-2" onclick="loadData()">🔄 Обновить</button>';
             document.getElementById('mainContent').innerHTML=h;
         }
