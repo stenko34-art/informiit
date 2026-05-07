@@ -45,8 +45,6 @@
             var json=JSON.parse(text.substring(text.indexOf('{'),text.lastIndexOf('}')+1));
             var rows=json.table.rows;
             var tasks={};
-            
-            // Ищем студента в столбце D (индекс 3)
             var cells=null;
             for(var i=2;i<rows.length;i++){
                 var c=rows[i].c;if(!c||!c[3])continue;
@@ -55,36 +53,31 @@
             }
             if(!cells)return{tasks:{}};
             
-            // ЕДИНЫЙ АЛГОРИТМ: идём по заголовкам из 2-й строки (индекс 1)
+            // ЕДИНАЯ КАРТА: заголовки из 2-й строки
             var headers=rows[1].c;
             var prevNum=0;
+            var startCol=type==='ПЗ'?6:4; // ПЗ с G(6), ЛР с E(4)
             
-            for(var j=4;j<headers.length-3;j++){
+            for(var j=startCol;j<headers.length-3;j++){
                 var hdr=getV(headers[j]);
                 if(!hdr)continue;
-                
-                // Пропускаем служебные столбцы
                 var l=hdr.toLowerCase();
                 if(l.includes('вх')||l.includes('тест')||l.includes('п/р')||l.includes('excel')||
                    l.includes('сред')||l.includes('проп')||l.includes('осталось')||l.includes('ссылка')||
                    l.includes('номер')||l.includes('автом')||l.includes('допуск')||l.includes('с.с.')||
-                   l.includes('с.у.')||l.includes('д/з')||(l==='до'))continue;
-                
+                   l.includes('с.у.')||l.includes('д/з')||l==='до')continue;
                 var match=hdr.match(/^(\d+)/);
                 if(!match)continue;
-                
                 var num=parseInt(match[1]);
-                if(num===prevNum)continue; // пропускаем сдвоенные столбцы
+                if(num===prevNum)continue;
                 prevNum=num;
-                
-                var taskId=(type==='ПЗ'?'ПЗ ':'ЛР ')+num;
+                var tid=(type==='ПЗ'?'ПЗ ':'ЛР ')+num;
                 var nextHdr=getV(headers[j+1]);
                 var nextMatch=nextHdr.match(/^(\d+)/);
-                
                 if(nextMatch&&!nextHdr.toLowerCase().includes('excel')){
-                    tasks[taskId]={status:'',grade:getV(cells[j])};
+                    tasks[tid]={status:'',grade:getV(cells[j])};
                 }else{
-                    tasks[taskId]={status:getV(cells[j]),grade:getV(cells[j+1])};
+                    tasks[tid]={status:getV(cells[j]),grade:getV(cells[j+1])};
                 }
             }
             return{tasks:tasks};
@@ -105,10 +98,9 @@
 
         function loadData(){
             var d=document.getElementById('mainContent');
-            d.innerHTML='<div style="text-align:center;padding:40px;">🔄 Загрузка данных...</div>';
+            d.innerHTML='<div style="text-align:center;padding:40px;">🔄 Загрузка...</div>';
             var sid=SHEET_IDS[user.group]||SHEET_IDS['102'];
             var search=user.name.toLowerCase().replace(/\s+/g,' ').trim();
-            
             Promise.all([
                 fetch('https://docs.google.com/spreadsheets/d/'+sid+'/gviz/tq?tqx=out:json&sheet=ПЗ').then(function(r){return r.text();}),
                 fetch('https://docs.google.com/spreadsheets/d/'+sid+'/gviz/tq?tqx=out:json&sheet=ЛР').then(function(r){return r.text();}),
@@ -118,10 +110,7 @@
                 var lr=parseSheet(results[1],search,'ЛР');
                 var dop=parseDop(results[2],search);
                 renderPage(pz.tasks,lr.tasks,dop);
-            }).catch(function(e){
-                console.error(e);
-                d.innerHTML='<h2>📊 Мои оценки</h2><p style="color:#dc2626;">Ошибка загрузки</p>';
-            });
+            }).catch(function(e){console.error(e);d.innerHTML='<h2>📊 Мои оценки</h2><p style="color:#dc2626;">Ошибка</p>';});
         }
 
         function renderPage(pz,lr,dop){
