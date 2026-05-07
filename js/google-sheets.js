@@ -180,11 +180,34 @@ function getVal(cell) {
 
 function findStudentByName(name, students) {
     if (!students) return null;
-    var search = name.toLowerCase().replace(/\s+/g, ' ').trim();
+    
+    // Убираем лишние пробелы и приводим к нижнему регистру
+    var searchName = name.toLowerCase().replace(/\s+/g, ' ').trim();
+    
+    console.log('Ищем студента: "' + searchName + '"');
+    console.log('Всего студентов в группе: ' + students.length);
+    
+    // Сначала точное совпадение
     for (var i = 0; i < students.length; i++) {
         var sName = students[i].fio.toLowerCase().replace(/\s+/g, ' ').trim();
-        if (sName.includes(search) || search.includes(sName)) return students[i];
+        console.log('Студент ' + i + ': "' + sName + '"');
+        
+        if (sName === searchName) {
+            console.log('✅ Найдено точное совпадение!');
+            return students[i];
+        }
     }
+    
+    // Частичное совпадение (фамилия содержится в имени)
+    for (var i = 0; i < students.length; i++) {
+        var sName = students[i].fio.toLowerCase().replace(/\s+/g, ' ').trim();
+        if (sName.includes(searchName) || searchName.includes(sName)) {
+            console.log('✅ Найдено частичное совпадение!');
+            return students[i];
+        }
+    }
+    
+    console.log('❌ Студент не найден');
     return null;
 }
 
