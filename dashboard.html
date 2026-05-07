@@ -7,11 +7,38 @@
     <link rel="stylesheet" href="css/style.css">
     <style>
         iframe{width:100%;height:calc(100vh - 140px);border:none;border-radius:8px}
-        .task-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px;margin-top:16px}
-        .task-card{border:1px solid #e2e8f0;border-radius:12px;padding:16px;background:white;cursor:pointer;transition:.2s}
-        .task-card:hover{box-shadow:0 4px 12px rgba(0,0,0,.1)}
-        .task-card h4{margin-bottom:4px}
-        .task-card .score{font-size:1.5em;font-weight:700;color:#2563eb}
+        .task-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-top:16px}
+        .task-card{
+            border:2px solid #e2e8f0;
+            border-radius:12px;
+            padding:14px;
+            text-align:center;
+            background:white;
+            transition:.2s;
+            cursor:pointer;
+        }
+        .task-card:hover{box-shadow:0 4px 12px rgba(0,0,0,.1);transform:translateY(-2px)}
+        .task-card h4{font-size:.85em;margin-bottom:6px;color:#64748b}
+        .task-card .grade{font-size:2em;font-weight:700;margin:6px 0}
+        .grade-pass{color:#059669}
+        .grade-fail{color:#dc2626}
+        .grade-empty{color:#94a3b8}
+        .grade-good{color:#2563eb}
+        .status-badge{
+            display:inline-block;
+            padding:3px 8px;
+            border-radius:10px;
+            font-size:.7em;
+            font-weight:600;
+        }
+        .badge-done{background:#ecfdf5;color:#065f46}
+        .badge-fail{background:#fef2f2;color:#991b1b}
+        .badge-pending{background:#f1f5f9;color:#475569}
+        .badge-good{background:#eff6ff;color:#1e40af}
+        .loading-text{text-align:center;padding:40px;color:#94a3b8}
+        .from-sheets{font-size:.65em;color:#94a3b8;margin-top:4px}
+        .refresh-btn{margin-top:16px;text-align:center}
+        .summary{margin-bottom:16px;padding:12px;background:#f8fafc;border-radius:8px}
     </style>
 </head>
 <body>
@@ -19,7 +46,7 @@
         <h1>📚 Информатика — СПО 1 курс</h1>
         <div class="user-block">
             <span id="userName">Загрузка...</span>
-            <button class="btn btn-outline btn-sm" onclick="logout()">🚪 Выйти</button>
+            <button class="btn btn-outline btn-sm" onclick="doLogout()">🚪 Выйти</button>
         </div>
     </header>
 
@@ -27,25 +54,35 @@
         <nav class="sidebar">
             <h3>📋 Навигация</h3>
             <ul class="nav-list">
-                <li><a href="#" onclick="showProgress()" id="navProgress" class="active">📊 Мой прогресс</a></li>
-                <li class="section-title">Цифровая грамотность</li>
-                <li><a href="#" onclick="openTask('pz1')">💻 ПЗ №1 — Аппаратное обеспечение</a></li>
-                <li><a href="#" onclick="openTask('pz2')">📁 ПЗ №2 — Файлы и папки</a></li>
-                <li><a href="#" onclick="openTask('pz3')">🌐 ПЗ №3 — Локальная сеть</a></li>
-                <li><a href="#" onclick="openTask('pz5')">🌍 ПЗ №5 — Интернет-сервисы</a></li>
-                <li><a href="#" onclick="openTask('pz6')">🛡️ ПЗ №6 — Антивирус</a></li>
-                <li><a href="#" onclick="openTask('pz7')">🗜️ ПЗ №7 — Архивация</a></li>
-                <li class="section-title">Теория информатики</li>
-                <li><a href="#" onclick="openTask('pz8')">🖼️ ПЗ №8 — Дискретизация</a></li>
+                <li><a href="#" onclick="showProgress()" id="navProgress" class="active">📊 Мои оценки</a></li>
+                <li class="section-title">Лабораторные работы</li>
+                <li><a href="#" onclick="openPZ('lr1')">🔬 ЛР №1 — Браузер</a></li>
+                <li><a href="#" onclick="openPZ('lr2')">🔬 ЛР №2 — Поисковые системы</a></li>
+                <li><a href="#" onclick="openPZ('lr3')">🔬 ЛР №3 — Лицензионное ПО</a></li>
+                <li><a href="#" onclick="openPZ('lr4')">🔬 ЛР №4-5 — Атрибуты файлов</a></li>
+                <li><a href="#" onclick="openPZ('lr6')">🔬 ЛР №6 — Внешние устройства</a></li>
+                <li><a href="#" onclick="openPZ('lr7')">🔬 ЛР №7 — Создание публикаций</a></li>
+                <li class="section-title">Практические занятия</li>
+                <li><a href="#" onclick="openPZ('pz1')">📝 ПЗ №1 — Аппаратное обеспечение</a></li>
+                <li><a href="#" onclick="openPZ('pz2')">📝 ПЗ №2 — Файлы и папки</a></li>
+                <li><a href="#" onclick="openPZ('pz3')">📝 ПЗ №3 — Локальная сеть</a></li>
+                <li><a href="#" onclick="openPZ('pz5')">📝 ПЗ №5 — Интернет-сервисы</a></li>
+                <li><a href="#" onclick="openPZ('pz6')">📝 ПЗ №6 — Антивирус</a></li>
+                <li><a href="#" onclick="openPZ('pz7')">📝 ПЗ №7 — Архивация</a></li>
+                <li><a href="#" onclick="openPZ('pz8')">📝 ПЗ №8 — Дискретизация</a></li>
             </ul>
         </nav>
 
         <main class="main-content" id="mainContent">
-            <p class="text-muted">Загрузка...</p>
+            <div class="loading-text">
+                <p>🔄 Загрузка данных из Google Таблиц...</p>
+                <p style="font-size:.8em;">Группа: <span id="groupInfo"></span></p>
+            </div>
         </main>
     </div>
 
     <script src="js/auth.js"></script>
+    <script src="js/google-sheets.js"></script>
     <script>
         // Проверка входа
         var user = checkAuth();
@@ -54,71 +91,149 @@
         }
         
         document.getElementById('userName').textContent = user.name + ' (гр. ' + user.group + ')';
+        document.getElementById('groupInfo').textContent = user.group;
         
-        // Задания
-        var TASKS = {
-            pz1:{name:'ПЗ №1 — Аппаратное обеспечение',max:16},
-            pz2:{name:'ПЗ №2 — Файлы и папки',max:15},
-            pz3:{name:'ПЗ №3 — Локальная сеть',max:24},
-            pz5:{name:'ПЗ №5 — Интернет-сервисы',max:5},
-            pz6:{name:'ПЗ №6 — Антивирус',max:5},
-            pz7:{name:'ПЗ №7 — Архивация',max:16},
-            pz8:{name:'ПЗ №8 — Дискретизация',max:20}
+        // Названия заданий
+        var TASK_NAMES = {
+            'ЛР1': 'ЛР №1 — Браузер',
+            'ЛР2': 'ЛР №2 — Поисковые системы',
+            'ЛР3': 'ЛР №3 — Лицензионное ПО',
+            'ЛР4,5': 'ЛР №4-5 — Атрибуты файлов',
+            'ЛР6': 'ЛР №6 — Внешние устройства',
+            'ЛР7': 'ЛР №7 — Публикации',
+            'ПЗ1': 'ПЗ №1 — Аппаратное обеспечение',
+            'ПЗ2': 'ПЗ №2 — Файлы и папки',
+            'ПЗ3': 'ПЗ №3 — Локальная сеть',
+            'ПЗ5': 'ПЗ №5 — Интернет-сервисы',
+            'ПЗ6': 'ПЗ №6 — Антивирус',
+            'ПЗ7': 'ПЗ №7 — Архивация',
+            'ПЗ8': 'ПЗ №8 — Дискретизация'
         };
         
-        // Показать прогресс
-        function showProgress(){
+        var sheetStudent = null; // Данные студента из Google Sheets
+        
+        // Загружаем данные при открытии
+        loadSheetData();
+        
+        function loadSheetData() {
+            showLoading();
+            
+            GoogleSheets.getStudentSheetData(user.name, user.group).then(function(student) {
+                sheetStudent = student;
+                showProgress();
+            }).catch(function() {
+                sheetStudent = null;
+                showProgress();
+            });
+        }
+        
+        function showLoading() {
+            document.getElementById('mainContent').innerHTML = 
+                '<div class="loading-text">🔄 Загрузка данных из Google Таблиц...</div>';
+        }
+        
+        function showProgress() {
             document.querySelectorAll('.nav-list a').forEach(function(a){a.classList.remove('active')});
             document.getElementById('navProgress').classList.add('active');
             
-            var h = '<h2>📊 Мой прогресс</h2>';
-            h += '<p class="text-muted mb-2">Студент: <b>' + user.name + '</b> | Группа: <b>' + user.group + '</b></p>';
+            var h = '<h2>📊 Мои оценки</h2>';
+            h += '<p class="text-muted">Студент: <b>' + user.name + '</b> | Группа: <b>' + user.group + '</b></p>';
+            
+            if (!sheetStudent) {
+                h += '<div style="text-align:center;padding:40px;color:#94a3b8;">';
+                h += '<p>❌ Не удалось загрузить данные из Google Таблиц</p>';
+                h += '<p style="font-size:.8em;">Проверьте, что таблица опубликована (Файл → Опубликовать в интернете)</p>';
+                h += '<button class="btn btn-primary mt-2" onclick="loadSheetData()">🔄 Попробовать снова</button>';
+                h += '</div>';
+                document.getElementById('mainContent').innerHTML = h;
+                return;
+            }
+            
+            // Считаем статистику
+            var totalTasks = GoogleSheets.TASK_ORDER.length;
+            var doneTasks = 0;
+            var failedTasks = 0;
+            
+            GoogleSheets.TASK_ORDER.forEach(function(taskId) {
+                var task = sheetStudent.tasks[taskId];
+                if (task && task.grade && task.status !== '2') {
+                    doneTasks++;
+                } else if (task && task.status === '2') {
+                    failedTasks++;
+                }
+            });
+            
+            // Сводка
+            h += '<div class="summary">';
+            h += '✅ Сдано: <b>' + doneTasks + '</b> | ';
+            h += '❌ Долги: <b>' + failedTasks + '</b> | ';
+            h += '📋 Всего: <b>' + totalTasks + '</b>';
+            h += '</div>';
+            
+            // Карточки заданий
             h += '<div class="task-grid">';
             
-            for(var id in TASKS){
-                var t = TASKS[id];
-                var r = getTaskResult(user.login, id);
-                var score = r ? r.score : null;
-                var pct = r ? r.percent : 0;
-                var color = pct >= 80 ? 'bg-green' : pct >= 50 ? 'bg-yellow' : '';
-                var status = score === null ? 'Не выполнено' : pct >= 80 ? '✅ Отлично' : pct >= 50 ? '⚠️ Частично' : '❌ Низкий балл';
+            GoogleSheets.TASK_ORDER.forEach(function(taskId) {
+                var task = sheetStudent.tasks[taskId];
+                var status = task ? task.status : '';
+                var grade = task ? task.grade : '';
+                var name = TASK_NAMES[taskId] || taskId;
                 
-                h += '<div class="task-card" onclick="openTask(\''+id+'\')">';
-                h += '<h4>'+t.name+'</h4>';
-                h += '<div class="score">'+(score !== null ? score : '—')+'<small style="font-size:.5em;color:#94a3b8">/'+t.max+'</small></div>';
-                if(score !== null){
-                    h += '<div class="progress-bar mt-1"><div class="progress-fill '+color+'" style="width:'+pct+'%"></div></div>';
+                var gradeDisplay = '—';
+                var gradeClass = 'grade-empty';
+                var badgeHtml = '';
+                
+                if (grade && status !== '2') {
+                    // Сдано с оценкой
+                    gradeDisplay = grade;
+                    if (grade === '5' || grade === '4') gradeClass = 'grade-good';
+                    else if (grade === '3') gradeClass = 'grade-pass';
+                    else gradeClass = 'grade-pass';
+                    badgeHtml = '<span class="status-badge badge-done">Сдано</span>';
+                } else if (status === '2' && !grade) {
+                    // Не сдано (долг)
+                    gradeDisplay = '2';
+                    gradeClass = 'grade-fail';
+                    badgeHtml = '<span class="status-badge badge-fail">Долг</span>';
+                } else if (status === '2' && grade) {
+                    // Пересдача
+                    gradeDisplay = grade;
+                    gradeClass = 'grade-fail';
+                    badgeHtml = '<span class="status-badge badge-fail">Пересдача</span>';
+                } else if (status === 'н' || grade) {
+                    // Зачтено
+                    gradeDisplay = grade || '✓';
+                    gradeClass = 'grade-pass';
+                    badgeHtml = '<span class="status-badge badge-done">Зачтено</span>';
+                } else {
+                    badgeHtml = '<span class="status-badge badge-pending">Ожидает</span>';
                 }
-                h += '<p style="font-size:.8em;color:#64748b;margin-top:4px">'+status+'</p>';
+                
+                h += '<div class="task-card">';
+                h += '<h4>' + name + '</h4>';
+                h += '<div class="grade ' + gradeClass + '">' + gradeDisplay + '</div>';
+                h += badgeHtml;
+                h += '<p class="from-sheets">из Google Таблиц</p>';
                 h += '</div>';
-            }
+            });
+            
+            h += '</div>';
+            
+            // Кнопка обновления
+            h += '<div class="refresh-btn">';
+            h += '<button class="btn btn-secondary" onclick="loadSheetData()">🔄 Обновить данные из таблиц</button>';
             h += '</div>';
             
             document.getElementById('mainContent').innerHTML = h;
         }
         
-        // Открыть задание
-        function openTask(tid){
-            document.querySelectorAll('.nav-list a').forEach(function(a){a.classList.remove('active')});
+        function openPZ(taskId) {
             document.getElementById('mainContent').innerHTML = 
-                '<h2>📝 ' + TASKS[tid].name + '</h2>' +
-                '<p class="text-muted mb-2">Максимум: ' + TASKS[tid].max + ' баллов</p>' +
-                '<iframe src="pz/' + tid + '.html?user=' + user.login + '&name=' + encodeURIComponent(user.name) + '&group=' + user.group + '"></iframe>';
+                '<p class="text-muted mb-2">📝 ' + (TASK_NAMES[taskId] || taskId) + '</p>' +
+                '<p style="color:#94a3b8;text-align:center;padding:40px;">Интерактивное задание в разработке</p>';
         }
         
-        // Сохранить результат из задания
-        window.addEventListener('message', function(e){
-            if(e.data.type === 'saveResult'){
-                saveTaskResult(user.login, e.data.taskId, e.data.score, e.data.maxScore);
-                showProgress();
-            }
-        });
-        
-        // Загружаем прогресс при открытии
-        showProgress();
-        
-        // Обработка выхода
-        function logout(){
+        function doLogout() {
             sessionStorage.removeItem('currentUser');
             window.location.href = 'index.html';
         }
