@@ -152,42 +152,58 @@
             if (!row || !row.cells) return tasks;
             
             var cells = row.cells;
-            
-            // Заголовки из 2-й строки (индекс 1 в JSON)
             var headers = row._headers || [];
             
-            // Проходим по всем ячейкам, начиная с колонки E (индекс 4)
-            for (var i = 4; i < cells.length - 3; i++) {
-                var headerCell = headers[i];
-                if (!headerCell) continue;
+            var i = 4; // Начинаем с колонки E
+            
+            while (i < cells.length - 3) {
+                var headerText = String(headers[i] || '').trim();
                 
-                var headerText = String(headerCell).trim();
+                // Пропускаем служебные столбцы
+                if (!headerText || 
+                    headerText.includes('Вх') || 
+                    headerText.includes('тест') || 
+                    headerText.includes('П/р') || 
+                    headerText.includes('Excel') ||
+                    headerText.includes('сред') ||
+                    headerText.includes('проп') ||
+                    headerText.includes('Осталось') ||
+                    headerText.includes('Ссылка') ||
+                    headerText.includes('Номер')) {
+                    i++;
+                    continue;
+                }
                 
-                // Ищем номера ПЗ/ЛР в заголовке
-                // Форматы: "1\n23.09", "2\n26.09", "5\n1.11", "19\n11" и т.д.
+                // Ищем номер работы в начале заголовка
                 var match = headerText.match(/^(\d+)/);
-                if (!match) continue;
+                if (!match) {
+                    i++;
+                    continue;
+                }
                 
                 var number = match[1];
-                var taskId = (type === 'ПЗ' ? 'ПЗ ' : 'ЛР ') + number;
                 
-                // Проверяем, что это действительно номер работы, а не что-то другое
-                // Пропускаем "Вх кон", "тест с.с." и т.д.
-                if (headerText.includes('Вх') || headerText.includes('тест') || headerText.includes('П/р') || headerText.includes('Excel')) continue;
+                // Проверяем, не является ли следующая ячейка продолжением заголовка
+                var nextHeader = String(headers[i + 1] || '').trim();
+                var nextMatch = nextHeader.match(/^(\d+)/);
                 
-                // Берём значение из текущей ячейки (статус) и следующей (оценка)
+                // Если следующая ячейка тоже начинается с числа — это новый заголовок
+                // Значит текущая работа имеет только одну ячейку (статус = оценка)
+                if (nextMatch && !nextHeader.includes('Excel') && !nextHeader.includes('П/р')) {
+                    var gradeVal = getVal(cells[i]);
+                    var taskId = (type === 'ПЗ' ? 'ПЗ ' : 'ЛР ') + number;
+                    tasks[taskId] = { status: '', grade: gradeVal };
+                    i++;
+                    continue;
+                }
+                
+                // Обычный случай: первая ячейка — статус, вторая — оценка
                 var statusVal = getVal(cells[i]);
                 var gradeVal = getVal(cells[i + 1]);
+                var taskId = (type === 'ПЗ' ? 'ПЗ ' : 'ЛР ') + number;
                 
-                // Проверяем, что следующая ячейка — это оценка, а не новый заголовок
-                var nextHeader = headers[i + 1];
-                if (nextHeader && String(nextHeader).trim().match(/^\d+/)) {
-                    // Следующая ячейка — начало новой работы, значит у этой только статус
-                    tasks[taskId] = { status: statusVal, grade: '' };
-                } else {
-                    tasks[taskId] = { status: statusVal, grade: gradeVal };
-                    i++; // Пропускаем ячейку с оценкой
-                }
+                tasks[taskId] = { status: statusVal, grade: gradeVal };
+                i += 2; // Пропускаем обе ячейки
             }
             
             return tasks;
