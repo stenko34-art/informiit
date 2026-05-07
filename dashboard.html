@@ -41,15 +41,31 @@
 
         function getV(c){if(!c)return'';var v=c.v;if(v===null||v===undefined)v=c.f||'';return String(v).trim();}
 
+        // Находит строку с заголовками (где больше всего чисел)
+        function findHeaderRow(rows){
+            var bestRow=0,bestCount=0;
+            for(var i=0;i<Math.min(rows.length,3);i++){
+                var c=rows[i].c;if(!c)continue;
+                var count=0;
+                for(var j=4;j<c.length-3;j++){
+                    var v=getV(c[j]);
+                    if(v&&/^\d+/.test(v))count++;
+                }
+                if(count>bestCount){bestCount=count;bestRow=i;}
+            }
+            return bestRow;
+        }
+
         function parseSheet(text, search, type){
             var json=JSON.parse(text.substring(text.indexOf('{'),text.lastIndexOf('}')+1));
             var rows=json.table.rows;
             var tasks={};
             
-            // ЗАГОЛОВКИ В СТРОКЕ 0 (индекс 0)!
-            var headers=rows[0].c;
+            // Авто-поиск строки заголовков
+            var headerRow=findHeaderRow(rows);
+            var headers=rows[headerRow].c;
             
-            // Ищем студента (начиная со строки 2)
+            // Ищем студента
             var cells=null;
             for(var i=2;i<rows.length;i++){
                 var c=rows[i].c;if(!c||!c[3])continue;
@@ -68,7 +84,8 @@
                 if(l.includes('вх')||l.includes('тест')||l.includes('п/р')||l.includes('excel')||
                    l.includes('сред')||l.includes('проп')||l.includes('осталось')||l.includes('ссылка')||
                    l.includes('номер')||l.includes('автом')||l.includes('допуск')||l.includes('с.с.')||
-                   l.includes('с.у.')||l.includes('д/з')||l==='до'||l.includes('студент'))continue;
+                   l.includes('с.у.')||l.includes('д/з')||l==='до'||l.includes('студент')||
+                   l.includes('учитывается'))continue;
                 
                 var match=hdr.match(/^(\d+)/);
                 if(!match)continue;
@@ -82,9 +99,11 @@
                 var nextHdr=j+1<headers.length?getV(headers[j+1]):'';
                 var nextMatch=nextHdr.match(/^(\d+)/);
                 
+                // Если следующая ячейка тоже число — это одиночный столбец (оценка)
                 if(nextMatch && !nextHdr.toLowerCase().includes('excel')){
                     tasks[taskId]={status:'',grade:getV(cells[j])};
                 }else{
+                    // Два столбца: статус + оценка
                     tasks[taskId]={status:getV(cells[j]),grade:getV(cells[j+1])};
                 }
             }
