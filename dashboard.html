@@ -94,62 +94,101 @@
             });
         }
 
-        function parseAll(text, search, type) {
-            var json = JSON.parse(text.substring(text.indexOf('{'), text.lastIndexOf('}') + 1));
-            var rows = json.table.rows;
-            
-            // Заголовки из строки 2 (индекс 1)
-            var headers = [];
-            if (rows[1] && rows[1].c) {
-                for (var i = 0; i < rows[1].c.length; i++) {
-                    headers[i] = rows[1].c[i] ? String(rows[1].c[i].v || rows[1].c[i].f || '') : '';
-                }
-            }
-            
-            // Ищем студента
-            var studentCells = null;
-            for (var i = 2; i < rows.length; i++) {
-                var cells = rows[i].c;
-                if (!cells || !cells[3]) continue;
-                var fio = String(cells[3].v || '').trim().toLowerCase().replace(/\s+/g, ' ');
-                if (fio === search || fio.includes(search) || search.includes(fio)) {
-                    studentCells = cells;
-                    break;
-                }
-            }
-            
-            // Парсим задания: идём по заголовкам, находим номера
-            var tasks = {};
-            if (studentCells) {
-                var prevNum = 0;
-                for (var i = 4; i < headers.length - 3; i++) {
-                    var hdr = headers[i].trim();
-                    var match = hdr.match(/^(\d+)/);
-                    if (!match) continue;
-                    if (hdr.includes('Вх') || hdr.includes('тест') || hdr.includes('П/р') || hdr.includes('Excel') || hdr.includes('сред') || hdr.includes('проп') || hdr.includes('Осталось') || hdr.includes('Ссылка') || hdr.includes('Номер') || hdr.includes('Автом') || hdr.includes('Допуск')) continue;
-                    
-                    var num = parseInt(match[1]);
-                    if (num === prevNum) continue; // сдвоенный столбец
-                    prevNum = num;
-                    
-                    var taskId = (type === 'ПЗ' ? 'ПЗ ' : 'ЛР ') + num;
-                    
-                    // Проверяем следующую ячейку
-                    var nextHdr = (i + 1 < headers.length) ? headers[i + 1].trim() : '';
-                    var nextMatch = nextHdr.match(/^(\d+)/);
-                    
-                    if (nextMatch && !nextHdr.includes('Excel')) {
-                        // Только оценка
-                        tasks[taskId] = { status: '', grade: getV(studentCells[i]) };
-                    } else {
-                        // Статус + оценка
-                        tasks[taskId] = { status: getV(studentCells[i]), grade: getV(studentCells[i + 1]) };
-                    }
-                }
-            }
-            
-            return { student: studentCells, tasks: tasks, headers: headers };
+function parseAll(text, search, type) {
+    var json = JSON.parse(text.substring(text.indexOf('{'), text.lastIndexOf('}') + 1));
+    var rows = json.table.rows;
+    
+    // 1. НАХОДИМ ЗАГОЛОВКИ — ищем строку, где больше всего чисел (это строка с номерами ПЗ/ЛР)
+    var bestRowIndex = -1;
+    var maxNumbers = 0;
+    
+    for (var i = 0; i < Math.min(rows.length, 5); i++) {
+        var cells = rows[i].c;
+        if (!cells) continue;
+        var numbersCount = 0;
+        for (var j = 4; j < cells.length; j++) {
+            var val = getV(cells[j]);
+            if (val && /^\d+/.test(val)) numbersCount++;
         }
+        if (numbersCount > maxNumbers) {
+            maxNumbers = numbersCount;
+            bestRowIndex = i;
+        }
+    }
+    
+    // 2. СОБИРАЕМ КАРТУ ЗАГОЛОВКОВ
+    var headerMap = []; // [{index, number}, ...]
+    var headerCells = rows[bestRowIndex].c;
+    
+    for (var j = 4; j < headerCells.length; j++) {
+        var val = getV(headerCells[j]);
+        if (!val) continue;
+        
+        // Пропускаем служебные столбцы
+        var lower = val.toLowerCase();
+        if (lower.includes('вх') || lower.includes('тест') || 
+            lower.includes('п/р') || lower.includes('excel') ||
+            lower.includes('сред') || lower.includes('проп') ||
+            lower.includes('осталось') || lower.includes('ссылка') ||
+            lower.includes('номер') || lower.includes('автом') ||
+            lower.includes('допуск') || lower.includes('д/з') ||
+            lower.includes('с.с.') || lower.includes('с.у.') ||
+            lower.includes('до') && val.length <= 3) continue;
+        
+        // Проверяем, не дубль ли это (сдвоенный столбец)
+        var match = val.match(/^(\d+)/);
+        if (!match) continue;
+        
+        var num = parseInt(match[1]);
+        
+        // Пропускаем дубли (если такой номер уже есть)
+        var isDuplicate = false;
+        for (var k = 0; k < headerMap.length; k++) {
+            if (headerMap[k].number === num) {
+                isDuplicate = true;
+                break;
+            }
+        }
+        if (isDuplicate) continue;
+        
+        headerMap.push({ index: j, number: num });
+    }
+    
+    // 3. ИЩЕМ СТУДЕНТА
+    var studentCells = null;
+    for (var i = 2; i < rows.length; i++) {
+        var cells = rows[i].c;
+        if (!cells || !cells[3]) continue;
+        var fio = getV(cells[3]).toLowerCase().replace(/\s+/g, ' ');
+        if (fio === search || fio.includes(search) || search.includes(fio)) {
+            studentCells = cells;
+            break;
+        }
+    }
+    
+    // 4. ИЗВЛЕКАЕМ ОЦЕНКИ
+    var tasks = {};
+    if (studentCells) {
+        for (var k = 0; k < headerMap.length; k++) {
+            var h = headerMap[k];
+            var nextH = headerMap[k + 1];
+            
+            var taskId = (type === 'ПЗ' ? 'ПЗ ' : 'ЛР ') + h.number;
+            
+            // Если следующий заголовок через 1 ячейку — только оценка
+            if (nextH && nextH.index === h.index + 1) {
+                tasks[taskId] = { status: '', grade: getV(studentCells[h.index]) };
+            } else {
+                tasks[taskId] = { 
+                    status: getV(studentCells[h.index]), 
+                    grade: getV(studentCells[h.index + 1]) 
+                };
+            }
+        }
+    }
+    
+    return { student: studentCells, tasks: tasks };
+}
 
         function parseDop(text, search) {
             try {
