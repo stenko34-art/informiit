@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#1e293b">
     <title>Вход — Информатика СПО</title>
     <link rel="stylesheet" href="css/style.css">
 </head>
@@ -10,26 +11,34 @@
     <div class="auth-box">
         <h2>🔐 Вход в систему</h2>
         <p class="subtitle">Интерактивная платформа по информатике</p>
-        <input type="text" id="loginInput" class="form-control" placeholder="Логин (например: ivanov)" autocomplete="off" autofocus>
-        <input type="password" id="passwordInput" class="form-control" placeholder="Пароль (например: 101001)">
+        
+        <select id="groupSelect" class="form-control">
+            <option value="">Выберите группу</option>
+            <option value="101">Группа 101</option>
+            <option value="102">Группа 102</option>
+            <option value="103">Группа 103</option>
+            <option value="104">Группа 104</option>
+            <option value="105">Группа 105</option>
+            <option value="106">Группа 106</option>
+            <option value="107">Группа 107</option>
+            <option value="108">Группа 108</option>
+        </select>
+        
+        <input type="text" id="fioInput" class="form-control" placeholder="Введите вашу фамилию" autocomplete="off" autofocus>
+        
         <p class="error-msg" id="errorMsg"></p>
         <button class="btn btn-primary btn-block" onclick="doLogin()" style="padding:14px;font-size:1em;">Войти</button>
+        
         <p class="text-muted text-center mt-2" style="font-size:0.75em;">
-            📌 <b>ivanov</b> / <b>101001</b> | Админ: <b>admin</b> / <b>admin2024</b>
+            📌 Введите фамилию так, как в журнале<br>
+            👨‍🏫 <b>admin</b> / <b>admin2024</b> — вход для преподавателя
         </p>
     </div>
 
+    <script src="js/google-sheets.js"></script>
     <script>
-    // База студентов
-    var STUDENTS = {
-        'ivanov':   { password: '101001', name: 'Иванов Иван Иванович',    group: '101' },
-        'petrov':   { password: '101002', name: 'Петров Пётр Петрович',    group: '101' },
-        'sidorov':  { password: '101003', name: 'Сидоров Алексей Сергеевич', group: '101' },
-        'smirnov':  { password: '101004', name: 'Смирнов Дмитрий Андреевич', group: '101' },
-        'popov':    { password: '102001', name: 'Попов Александр Викторович', group: '102' },
-        'sokolov':  { password: '102002', name: 'Соколов Денис Игоревич',    group: '102' },
-        'admin':    { password: 'admin2024', name: 'Преподаватель', group: 'admin', isAdmin: true }
-    };
+    // Администратор
+    var ADMIN = { password: 'admin2024', name: 'Преподаватель', group: 'admin', isAdmin: true };
 
     // Хранилище результатов
     var resultsData = {};
@@ -44,72 +53,102 @@
 
     // Функция входа
     function doLogin() {
-        console.log('Кнопка нажата!'); // Для отладки
-        
-        var loginInput = document.getElementById('loginInput');
-        var passwordInput = document.getElementById('passwordInput');
+        var groupSelect = document.getElementById('groupSelect');
+        var fioInput = document.getElementById('fioInput');
         var errorMsg = document.getElementById('errorMsg');
         
-        var login = loginInput.value.trim().toLowerCase();
-        var password = passwordInput.value.trim();
+        var group = groupSelect.value;
+        var fio = fioInput.value.trim();
         
         errorMsg.style.display = 'none';
         
-        if (!login || !password) {
-            errorMsg.textContent = 'Введите логин и пароль';
-            errorMsg.style.display = 'block';
-            return;
-        }
-        
-        console.log('Логин:', login); // Для отладки
-        
-        var user = STUDENTS[login];
-        
-        if (!user) {
-            errorMsg.textContent = 'Студент с таким логином не найден';
-            errorMsg.style.display = 'block';
-            return;
-        }
-        
-        if (user.password !== password) {
-            errorMsg.textContent = 'Неверный пароль';
-            errorMsg.style.display = 'block';
-            return;
-        }
-        
-        console.log('Вход успешен!'); // Для отладки
-        
-        var currentUser = { 
-            login: login, 
-            name: user.name, 
-            group: user.group, 
-            isAdmin: user.isAdmin 
-        };
-        
-        if (!resultsData[login]) {
-            resultsData[login] = { tasks: {}, lastLogin: new Date().toISOString() };
-        }
-        saveResults();
-        
-        sessionStorage.setItem('currentUser', JSON.stringify(currentUser));
-        
-        if (user.isAdmin) {
+        // Проверка админа
+        if (fio.toLowerCase() === 'admin') {
+            var adminUser = { login: 'admin', name: ADMIN.name, group: 'admin', isAdmin: true };
+            sessionStorage.setItem('currentUser', JSON.stringify(adminUser));
             window.location.href = 'admin.html';
-        } else {
-            window.location.href = 'dashboard.html';
+            return;
         }
+        
+        if (!group) {
+            errorMsg.textContent = 'Выберите группу';
+            errorMsg.style.display = 'block';
+            return;
+        }
+        
+        if (!fio || fio.length < 2) {
+            errorMsg.textContent = 'Введите фамилию';
+            errorMsg.style.display = 'block';
+            return;
+        }
+        
+        // Показываем загрузку
+        errorMsg.textContent = '⏳ Ищем вас в таблице группы ' + group + '...';
+        errorMsg.style.color = '#2563eb';
+        errorMsg.style.display = 'block';
+        
+        // Ищем студента в Google Таблице
+        GoogleSheets.loadGroupData(group).then(function(students) {
+            if (!students || students.length === 0) {
+                errorMsg.textContent = '❌ Не удалось загрузить данные группы ' + group + '. Проверьте интернет.';
+                errorMsg.style.color = '#dc2626';
+                return;
+            }
+            
+            // Ищем студента по фамилии
+            var found = null;
+            var searchFio = fio.toLowerCase();
+            
+            for (var i = 0; i < students.length; i++) {
+                var studentFio = students[i].fio.toLowerCase();
+                if (studentFio.includes(searchFio)) {
+                    if (found) {
+                        // Найдено несколько совпадений
+                        errorMsg.textContent = '⚠️ Найдено несколько студентов с такой фамилией. Введите имя и фамилию.';
+                        errorMsg.style.color = '#d97706';
+                        return;
+                    }
+                    found = students[i];
+                }
+            }
+            
+            if (!found) {
+                errorMsg.textContent = '❌ Студент с фамилией "' + fio + '" не найден в группе ' + group;
+                errorMsg.style.color = '#dc2626';
+                return;
+            }
+            
+            // Успешный вход
+            var userKey = group + '_' + found.fio.replace(/\s+/g, '_');
+            
+            var currentUser = {
+                login: userKey,
+                name: found.fio,
+                group: group,
+                sheetData: found
+            };
+            
+            if (!resultsData[userKey]) {
+                resultsData[userKey] = { tasks: {}, lastLogin: new Date().toISOString() };
+            } else {
+                resultsData[userKey].lastLogin = new Date().toISOString();
+            }
+            saveResults();
+            
+            sessionStorage.setItem('currentUser', JSON.stringify(currentUser));
+            window.location.href = 'dashboard.html';
+            
+        }).catch(function(error) {
+            console.error('Ошибка:', error);
+            errorMsg.textContent = '❌ Ошибка загрузки данных. Попробуйте позже.';
+            errorMsg.style.color = '#dc2626';
+        });
     }
 
     // Вход по Enter
-    document.getElementById('passwordInput').addEventListener('keydown', function(e) {
-        if (e.key === 'Enter') {
-            console.log('Enter нажат!');
-            doLogin();
-        }
+    document.getElementById('fioInput').addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') doLogin();
     });
-
-    // Проверка загрузки
-    console.log('Страница загружена, функция doLogin готова');
     </script>
 </body>
 </html>
