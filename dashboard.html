@@ -129,21 +129,20 @@
             return String(v).trim();
         }
 
-        function renderPage(data) {
+                function renderPage(data) {
             var pzTasks = extractTasks(data.pz, 'ПЗ');
             var lrTasks = extractTasks(data.lr, 'ЛР');
             
-            // СТАТИСТИКА
             var pzAll = Object.values(pzTasks);
             var lrAll = Object.values(lrTasks);
             var allTasks = pzAll.concat(lrAll);
             
-            // Сдано = есть оценка И нет долга
+            // Сдано
             var done = allTasks.filter(function(t) {
-                return t.grade && !isNaN(parseFloat(t.grade)) && parseFloat(t.grade) > 0 && t.status !== '2' && t.status !== 'н';
+                return t.grade && !isNaN(parseFloat(t.grade)) && parseFloat(t.grade) > 0 && t.status !== '2';
             }).length;
             
-            // Долги = статус "2" ИЛИ статус "н" ИЛИ нет оценки
+            // Долги
             var debts = allTasks.filter(function(t) {
                 return t.status === '2' || t.status === 'н' || !t.grade || t.grade === '' || t.grade === '0';
             }).length;
@@ -153,10 +152,84 @@
             // Средние баллы
             var pzGrades = [];
             pzAll.forEach(function(t) {
-                if (t.grade && !isNaN(parseFloat(t.grade)) && parseFloat(t.grade) > 0 && t.status !== '2' && t.status !== 'н') {
+                if (t.grade && !isNaN(parseFloat(t.grade)) && parseFloat(t.grade) > 0 && t.status !== '2') {
                     pzGrades.push(parseFloat(t.grade));
                 }
             });
+            
+            var lrGrades = [];
+            lrAll.forEach(function(t) {
+                if (t.grade && !isNaN(parseFloat(t.grade)) && parseFloat(t.grade) > 0 && t.status !== '2') {
+                    lrGrades.push(parseFloat(t.grade));
+                }
+            });
+            
+            var allGrades = pzGrades.concat(lrGrades);
+            
+            var avgPZ = pzGrades.length ? (pzGrades.reduce(function(a,b){return a+b},0) / pzGrades.length) : 0;
+            var avgLR = lrGrades.length ? (lrGrades.reduce(function(a,b){return a+b},0) / lrGrades.length) : 0;
+            var avgAll = allGrades.length ? (allGrades.reduce(function(a,b){return a+b},0) / allGrades.length) : 0;
+            
+            avgPZ = Math.round(avgPZ * 10) / 10;
+            avgLR = Math.round(avgLR * 10) / 10;
+            avgAll = Math.round(avgAll * 10) / 10;
+
+            // Данные из листа Допуск
+            var dopText = '';
+            if (data.dop && data.dop.cells) {
+                var dc = data.dop.cells;
+                var dopusk = getVal(dc[2]) || '—';
+                var avtomat = getVal(dc[3]) || '—';
+                dopText = dopusk + ' | Автомат: ' + avtomat;
+            }
+
+            var h = '<h2>📊 Мои оценки</h2>';
+            h += '<p class="text-muted">' + user.name + ' | Группа ' + user.group + '</p>';
+
+            // ЕДИНАЯ панель статистики
+            h += '<div class="stats-grid">';
+            h += '<div class="stat-card"><div class="val c-green">' + done + '/' + total + '</div><div class="lbl">✅ Сдано работ</div></div>';
+            h += '<div class="stat-card"><div class="val c-red">' + debts + '</div><div class="lbl">❌ Долгов</div></div>';
+            h += '<div class="stat-card"><div class="val c-blue">' + (avgAll || '—') + '</div><div class="lbl">📊 Средний балл</div></div>';
+            h += '<div class="stat-card"><div class="val c-yellow">' + (avgPZ || '—') + ' / ' + (avgLR || '—') + '</div><div class="lbl">📝 ПЗ / 🔬 ЛР</div></div>';
+            if (dopText) {
+                h += '<div class="stat-card"><div class="val" style="font-size:1.2em;color:#6366f1;">' + dopText + '</div><div class="lbl">🎯 Допуск</div></div>';
+            }
+            h += '</div>';
+
+            // Прогресс-бар
+            var pct = total ? Math.round(done / total * 100) : 0;
+            var fillClass = pct >= 80 ? 'fill-green' : pct >= 50 ? 'fill-yellow' : 'fill-red';
+            h += '<div style="margin:8px 0;font-size:.8em;">Прогресс: <b>' + pct + '%</b> (' + done + ' из ' + total + ' сдано, ' + debts + ' долгов)</div>';
+            h += '<div class="progress-bar"><div class="progress-fill ' + fillClass + '" style="width:' + pct + '%"></div></div>';
+
+            // Практические занятия
+            h += '<div class="section-title">📝 Практические занятия (средний балл: ' + (avgPZ || '—') + ')</div>';
+            h += '<div class="task-grid">';
+            var pzOrder = ['ПЗ 1','ПЗ 2','ПЗ 3','ПЗ 5','ПЗ 6','ПЗ 7','ПЗ 8','ПЗ 9','ПЗ 10','ПЗ 11','ПЗ 12','ПЗ 13','ПЗ 14','ПЗ 15','ПЗ 16','ПЗ 17','ПЗ 18','ПЗ 19','ПЗ 20','ПЗ 21','ПЗ 24','ПЗ 25','ПЗ 27','ПЗ 28','ПЗ 29'];
+            pzOrder.forEach(function(id) {
+                if (pzTasks[id] !== undefined) {
+                    h += renderCard(id, id, pzTasks[id]);
+                }
+            });
+            h += '</div>';
+
+            // Лабораторные работы
+            h += '<div class="section-title">🔬 Лабораторные работы (средний балл: ' + (avgLR || '—') + ')</div>';
+            h += '<div class="task-grid">';
+            var lrOrder = ['ЛР 1','ЛР 2','ЛР 3','ЛР 4','ЛР 5','ЛР 6','ЛР 7','ЛР 8','ЛР 9','ЛР 10','ЛР 11','ЛР 12','ЛР 13','ЛР 14','ЛР 15','ЛР 16'];
+            lrOrder.forEach(function(id) {
+                if (lrTasks[id] !== undefined) {
+                    h += renderCard(id, id, lrTasks[id]);
+                }
+            });
+            h += '</div>';
+
+            h += '<button class="btn btn-secondary btn-sm mt-2" onclick="loadData()">🔄 Обновить</button>';
+            h += '<p style="font-size:.65em;color:#94a3b8;margin-top:4px;">Данные из Google Таблиц (листы ПЗ, ЛР, Допуск)</p>';
+
+            document.getElementById('mainContent').innerHTML = h;
+        }
             
             var lrGrades = [];
             lrAll.forEach(function(t) {
