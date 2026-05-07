@@ -2,12 +2,28 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Отладка — Информатика СПО</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Мои оценки — Информатика СПО</title>
     <link rel="stylesheet" href="css/style.css">
+    <style>
+        .task-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:6px;margin-top:8px}
+        .task-card{border:2px solid #e2e8f0;border-radius:8px;padding:8px;text-align:center;background:white}
+        .task-card h4{font-size:.7em;margin-bottom:2px;color:#64748b}
+        .task-card .grade{font-size:1.3em;font-weight:700;margin:2px 0}
+        .grade-5{color:#059669}.grade-4{color:#2563eb}.grade-3{color:#d97706}.grade-2{color:#dc2626}.grade-empty{color:#94a3b8}
+        .status-badge{display:inline-block;padding:2px 6px;border-radius:8px;font-size:.65em;font-weight:600}
+        .badge-done{background:#ecfdf5;color:#065f46}.badge-fail{background:#fef2f2;color:#991b1b}
+        .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin:12px 0}
+        .stat-card{background:linear-gradient(135deg,#f8fafc,#fff);border:1px solid #e2e8f0;border-radius:10px;padding:12px;text-align:center}
+        .stat-card .val{font-size:1.8em;font-weight:700}.stat-card .lbl{font-size:.7em;color:#64748b;margin-top:2px}
+        .c-green{color:#059669}.c-red{color:#dc2626}.c-blue{color:#2563eb}.c-yellow{color:#d97706}
+        .section-title{margin:14px 0 6px;font-weight:700;font-size:.85em;color:#1e293b;border-bottom:2px solid #e2e8f0;padding-bottom:4px}
+        .progress-bar{background:#e2e8f0;border-radius:4px;height:6px;margin-top:4px;overflow:hidden}
+        .progress-fill{height:6px;border-radius:4px}.fill-green{background:#059669}.fill-red{background:#dc2626}.fill-yellow{background:#d97706}
+    </style>
 </head>
 <body>
-    <header class="header"><h1>📚 Отладка парсера</h1><div class="user-block"><span id="userName"></span><button class="btn btn-outline btn-sm" onclick="doLogout()">🚪 Выйти</button></div></header>
+    <header class="header"><h1>📚 Информатика — СПО 1 курс</h1><div class="user-block"><span id="userName"></span><button class="btn btn-outline btn-sm" onclick="doLogout()">🚪 Выйти</button></div></header>
     <div class="container"><main class="main-content" id="mainContent" style="width:100%;"><div style="text-align:center;padding:40px;">🔄 Загрузка...</div></main></div>
 
     <script src="js/auth.js"></script>
@@ -17,62 +33,150 @@
         document.getElementById('userName').textContent = user.name + ' (гр. ' + user.group + ')';
 
         var SHEET_IDS = {
-            '102':'1AeNAFAkY1EDD4NfVUmk04j2nqZK3l2ltdXuDNX6bB-Q'
+            '101':'1e4fcZ6J6fHfsvb6xca8lP5AwSRT2t7b02GcHEZfTmwU','102':'1AeNAFAkY1EDD4NfVUmk04j2nqZK3l2ltdXuDNX6bB-Q',
+            '103':'1LSe4uS98lWDNyjigS028Kn4lV42u7N2DUjyJo3y3RHc','104':'1Z8uVSazOeBtclHgIBsYEBFCD_RikTjPzQyjyAZF2t3Y',
+            '105':'1Zga2Kn2BjzL1RCidFiNDbDtQF7IbLZzdZ8AE7AXM9fw','106':'1fNXJCnmJ_szR50v2RfPKx_xR2gHDL44hr7SxHI1oLgo',
+            '107':'1m-D6b57CdSPDEw6vcevvVMB4twmJReLa8xS4qyMFJ2Y','108':'1qwWCSk-EDVq1amZ3Hn8fKsJULBkthr8lr9_x68vjlsY'
         };
 
         function getV(c){if(!c)return'';var v=c.v;if(v===null||v===undefined)v=c.f||'';return String(v).trim();}
 
+        function parseSheet(text, search, type){
+            var json=JSON.parse(text.substring(text.indexOf('{'),text.lastIndexOf('}')+1));
+            var rows=json.table.rows;
+            var tasks={};
+            
+            // ЗАГОЛОВКИ В СТРОКЕ 0 (индекс 0)!
+            var headers=rows[0].c;
+            
+            // Ищем студента (начиная со строки 2)
+            var cells=null;
+            for(var i=2;i<rows.length;i++){
+                var c=rows[i].c;if(!c||!c[3])continue;
+                var f=getV(c[3]).toLowerCase().replace(/\s+/g,' ');
+                if(f===search||f.includes(search)||search.includes(f)){cells=c;break;}
+            }
+            if(!cells)return{tasks:{}};
+            
+            var prevNum=0;
+            
+            for(var j=4;j<headers.length-3;j++){
+                var hdr=getV(headers[j]);
+                if(!hdr)continue;
+                
+                var l=hdr.toLowerCase();
+                if(l.includes('вх')||l.includes('тест')||l.includes('п/р')||l.includes('excel')||
+                   l.includes('сред')||l.includes('проп')||l.includes('осталось')||l.includes('ссылка')||
+                   l.includes('номер')||l.includes('автом')||l.includes('допуск')||l.includes('с.с.')||
+                   l.includes('с.у.')||l.includes('д/з')||l==='до'||l.includes('студент'))continue;
+                
+                var match=hdr.match(/^(\d+)/);
+                if(!match)continue;
+                
+                var num=parseInt(match[1]);
+                if(num===prevNum)continue;
+                prevNum=num;
+                
+                var taskId=(type==='ПЗ'?'ПЗ ':'ЛР ')+num;
+                
+                var nextHdr=j+1<headers.length?getV(headers[j+1]):'';
+                var nextMatch=nextHdr.match(/^(\d+)/);
+                
+                if(nextMatch && !nextHdr.toLowerCase().includes('excel')){
+                    tasks[taskId]={status:'',grade:getV(cells[j])};
+                }else{
+                    tasks[taskId]={status:getV(cells[j]),grade:getV(cells[j+1])};
+                }
+            }
+            return{tasks:tasks};
+        }
+
+        function parseDop(text,search){
+            try{
+                var json=JSON.parse(text.substring(text.indexOf('{'),text.lastIndexOf('}')+1));
+                var rows=json.table.rows;
+                for(var i=2;i<rows.length;i++){
+                    var c=rows[i].c;if(!c||!c[1])continue;
+                    var f=getV(c[1]).toLowerCase().replace(/\s+/g,' ');
+                    if(f===search||f.includes(search)||search.includes(f))return{dopusk:getV(c[2]),avtomat:getV(c[3])};
+                }
+            }catch(e){}
+            return null;
+        }
+
         function loadData(){
             var d=document.getElementById('mainContent');
             d.innerHTML='<div style="text-align:center;padding:40px;">🔄 Загрузка...</div>';
-            var sid=SHEET_IDS['102'];
-            var search='вахрушев';
+            var sid=SHEET_IDS[user.group]||SHEET_IDS['102'];
+            var search=user.name.toLowerCase().replace(/\s+/g,' ').trim();
             
             Promise.all([
                 fetch('https://docs.google.com/spreadsheets/d/'+sid+'/gviz/tq?tqx=out:json&sheet=ПЗ').then(function(r){return r.text();}),
-                fetch('https://docs.google.com/spreadsheets/d/'+sid+'/gviz/tq?tqx=out:json&sheet=ЛР').then(function(r){return r.text();})
+                fetch('https://docs.google.com/spreadsheets/d/'+sid+'/gviz/tq?tqx=out:json&sheet=ЛР').then(function(r){return r.text();}),
+                fetch('https://docs.google.com/spreadsheets/d/'+sid+'/gviz/tq?tqx=out:json&sheet=Допуск').then(function(r){return r.text();})
             ]).then(function(results){
-                var pzJson=JSON.parse(results[0].substring(results[0].indexOf('{'),results[0].lastIndexOf('}')+1));
-                var lrJson=JSON.parse(results[1].substring(results[1].indexOf('{'),results[1].lastIndexOf('}')+1));
-                
-                var h='<h2>Отладка ПЗ</h2>';
-                
-                // Показываем заголовки (строка 2, индекс 1)
-                h+='<h3>Заголовки ПЗ (строка 2):</h3><div style="overflow-x:auto;"><table><tr><th>Индекс</th><th>Значение</th></tr>';
-                var pzHeaders=pzJson.table.rows[1].c;
-                for(var i=0;i<Math.min(pzHeaders.length,60);i++){
-                    h+='<tr><td>'+i+'</td><td>'+getV(pzHeaders[i])+'</td></tr>';
-                }
-                h+='</table></div>';
-                
-                // Ищем студента
-                h+='<h3>Поиск студента:</h3>';
-                for(var i=2;i<pzJson.table.rows.length;i++){
-                    var c=pzJson.table.rows[i].c;
-                    if(c&&c[3]){
-                        var f=getV(c[3]).toLowerCase();
-                        if(f.includes('вахрушев')){
-                            h+='<p>✅ Найден: строка '+i+', ФИО: '+getV(c[3])+'</p>';
-                            h+='<h3>Данные студента (первые 30 ячеек):</h3><div style="overflow-x:auto;"><table><tr><th>Индекс</th><th>Значение</th></tr>';
-                            for(var j=0;j<30;j++){
-                                h+='<tr><td>'+j+'</td><td>'+getV(c[j])+'</td></tr>';
-                            }
-                            h+='</table></div>';
-                            break;
-                        }
-                    }
-                }
-                
-                h+='<h2>Отладка ЛР</h2>';
-                h+='<h3>Заголовки ЛР (строка 2):</h3><div style="overflow-x:auto;"><table><tr><th>Индекс</th><th>Значение</th></tr>';
-                var lrHeaders=lrJson.table.rows[1].c;
-                for(var i=0;i<Math.min(lrHeaders.length,40);i++){
-                    h+='<tr><td>'+i+'</td><td>'+getV(lrHeaders[i])+'</td></tr>';
-                }
-                h+='</table></div>';
-                
-                d.innerHTML=h;
-            }).catch(function(e){d.innerHTML='<p style="color:#dc2626;">Ошибка: '+e.message+'</p>';});
+                var pz=parseSheet(results[0],search,'ПЗ');
+                var lr=parseSheet(results[1],search,'ЛР');
+                var dop=parseDop(results[2],search);
+                renderPage(pz.tasks,lr.tasks,dop);
+            }).catch(function(e){console.error(e);d.innerHTML='<h2>📊 Мои оценки</h2><p style="color:#dc2626;">Ошибка загрузки</p>';});
+        }
+
+        function renderPage(pz,lr,dop){
+            var all={};for(var k in pz)all[k]=pz[k];for(var k in lr)all[k]=lr[k];
+            var pzArr=Object.values(pz),lrArr=Object.values(lr),allArr=Object.values(all);
+            var done=allArr.filter(function(t){return t.grade&&!isNaN(parseFloat(t.grade))&&parseFloat(t.grade)>0&&t.status!=='2';}).length;
+            var debts=allArr.filter(function(t){return t.status==='2'||t.status==='н'||!t.grade||t.grade===''||t.grade==='0';}).length;
+            var total=allArr.length;
+            var getAvg=function(arr){var g=arr.filter(function(t){return t.grade&&!isNaN(parseFloat(t.grade))&&parseFloat(t.grade)>0&&t.status!=='2';}).map(function(t){return parseFloat(t.grade);});return g.length?Math.round(g.reduce(function(a,b){return a+b},0)/g.length*10)/10:0;};
+            var avgPZ=getAvg(pzArr),avgLR=getAvg(lrArr),avgAll=getAvg(allArr);
+            
+            var h='<h2>📊 Мои оценки</h2>';
+            h+='<p class="text-muted" style="margin-bottom:4px;">'+user.name+' | Группа '+user.group+'</p>';
+            
+            if(dop){
+                var dt='',dc='',db='',at='',ac='',ab='';
+                if(dop.dopusk==='ДОП'){dt='ДОПУЩЕН';dc='#059669';db='#ecfdf5';}
+                else if(dop.dopusk==='НЕДОП'){dt='НЕ ДОПУЩЕН';dc='#dc2626';db='#fef2f2';}
+                if(dop.avtomat==='да'){at='АВТОМАТ';ac='#059669';ab='#ecfdf5';}
+                else if(dop.avtomat==='нет'){at='НЕТ АВТОМАТА';ac='#dc2626';ab='#fef2f2';}
+                h+='<div style="margin-bottom:8px;">';
+                if(dt)h+='<span style="display:inline-block;padding:3px 10px;border-radius:5px;font-size:.75em;font-weight:700;background:'+db+';color:'+dc+';margin-right:6px;">'+dt+'</span>';
+                if(at)h+='<span style="display:inline-block;padding:3px 10px;border-radius:5px;font-size:.75em;font-weight:700;background:'+ab+';color:'+ac+';">'+at+'</span>';
+                h+='</div>';
+            }
+            
+            h+='<div class="stats-grid">';
+            h+='<div class="stat-card"><div class="val c-green">'+done+'/'+total+'</div><div class="lbl">✅ Сдано</div></div>';
+            h+='<div class="stat-card"><div class="val c-red">'+debts+'</div><div class="lbl">❌ Долги</div></div>';
+            h+='<div class="stat-card"><div class="val c-blue">'+(avgAll||'—')+'</div><div class="lbl">📊 Средний балл</div></div>';
+            h+='<div class="stat-card"><div class="val c-yellow">'+(avgPZ||'—')+' / '+(avgLR||'—')+'</div><div class="lbl">📝 ПЗ / 🔬 ЛР</div></div>';
+            h+='</div>';
+            
+            var pct=total?Math.round(done/total*100):0,fc=pct>=80?'fill-green':pct>=50?'fill-yellow':'fill-red';
+            h+='<div style="margin:8px 0;font-size:.8em;">Прогресс: <b>'+pct+'%</b> ('+done+' из '+total+' сдано, '+debts+' долгов)</div>';
+            h+='<div class="progress-bar"><div class="progress-fill '+fc+'" style="width:'+pct+'%"></div></div>';
+            
+            var pzKeys=Object.keys(pz).sort(function(a,b){return parseInt(a.replace('ПЗ ',''))-parseInt(b.replace('ПЗ ',''));});
+            var lrKeys=Object.keys(lr).sort(function(a,b){return parseInt(a.replace('ЛР ',''))-parseInt(b.replace('ЛР ',''));});
+            h+='<div class="section-title">📝 Практические занятия (ср. балл: '+(avgPZ||'—')+')</div><div class="task-grid">';
+            pzKeys.forEach(function(id){h+=card(id,pz[id]);});
+            h+='</div>';
+            h+='<div class="section-title">🔬 Лабораторные работы (ср. балл: '+(avgLR||'—')+')</div><div class="task-grid">';
+            lrKeys.forEach(function(id){h+=card(id,lr[id]);});
+            h+='</div>';
+            h+='<button class="btn btn-secondary btn-sm mt-2" onclick="loadData()">🔄 Обновить</button>';
+            document.getElementById('mainContent').innerHTML=h;
+        }
+
+        function card(id,t){
+            var s=t?t.status||'':'',g=t?t.grade||'':'',has=g&&!isNaN(parseFloat(g))&&parseFloat(g)>0;
+            var isDone=has&&s!=='2',disp=isDone?g:'долг';
+            var cls=isDone?('grade-'+(parseFloat(g)>=5?'5':parseFloat(g)>=4?'4':parseFloat(g)>=3?'3':'2')):'grade-2';
+            var badge=isDone?'<span class="status-badge badge-done">✔</span>':'<span class="status-badge badge-fail">✘</span>';
+            if(s==='2'&&has){var avg=Math.ceil((2+parseFloat(g))/2);disp=avg;cls='grade-'+(avg>=5?'5':avg>=4?'4':avg>=3?'3':'2');badge='<span class="status-badge badge-done">✔</span>';}
+            if(s==='н'&&has){disp=g;cls='grade-'+(parseFloat(g)>=5?'5':parseFloat(g)>=4?'4':parseFloat(g)>=3?'3':'2');badge='<span class="status-badge badge-done">✔</span>';}
+            return '<div class="task-card"><h4>'+id+'</h4><div class="grade '+cls+'">'+disp+'</div>'+badge+'</div>';
         }
 
         function doLogout(){sessionStorage.removeItem('currentUser');window.location.href='index.html';}
