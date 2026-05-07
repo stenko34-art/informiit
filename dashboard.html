@@ -220,7 +220,7 @@
             // Практические занятия
             h += '<div class="section-title">📝 Практические занятия (средний балл: ' + (avgPZ || '—') + ')</div>';
             h += '<div class="task-grid">';
-            var pzOrder = ['ПЗ1','ПЗ2','ПЗ3','ПЗ5','ПЗ6','ПЗ7','ПЗ8','ПЗ9','ПЗ10','ПЗ11','ПЗ12','ПЗ13','ПЗ14','ПЗ15','ПЗ16','ПЗ17','ПЗ18','ПЗ19','ПЗ20','ПЗ21','ПЗ24','ПЗ25','ПЗ27','ПЗ28','ПЗ29'];
+            var pzOrder = ['ПЗ 1','ПЗ 2','ПЗ 3','ПЗ 5','ПЗ 6','ПЗ 7','ПЗ 8','ПЗ 9','ПЗ 10','ПЗ 11','ПЗ 12','ПЗ 13','ПЗ 14','ПЗ 15','ПЗ 16','ПЗ 17','ПЗ 18','ПЗ 19','ПЗ 20','ПЗ 21','ПЗ 24','ПЗ 25','ПЗ 27','ПЗ 28','ПЗ 29'];
             pzOrder.forEach(function(id) {
                 if (pzTasks[id] !== undefined) {
                     h += renderCard(id, id, pzTasks[id]);
@@ -231,7 +231,7 @@
             // Лабораторные работы
             h += '<div class="section-title">🔬 Лабораторные работы (средний балл: ' + (avgLR || '—') + ')</div>';
             h += '<div class="task-grid">';
-            var lrOrder = ['ЛР1','ЛР2','ЛР3','ЛР4','ЛР5','ЛР6','ЛР7','ЛР8','ЛР9','ЛР10','ЛР11','ЛР12','ЛР13','ЛР14','ЛР15','ЛР16'];
+            var lrOrder = ['ЛР 1','ЛР 2','ЛР 3','ЛР 4','ЛР 5','ЛР 6','ЛР 7','ЛР 8','ЛР 9','ЛР 10','ЛР 11','ЛР 12','ЛР 13','ЛР 14','ЛР 15','ЛР 16'];
             lrOrder.forEach(function(id) {
                 if (lrTasks[id] !== undefined) {
                     h += renderCard(id, id, lrTasks[id]);
@@ -252,7 +252,7 @@
             
             if (type === 'ПЗ') {
                 var cols = [6,8,10,12,14,16,18,20,22,24,26,28,30,32,34,36,38,40,42,44,46,48,50,52,54];
-                var names = ['ПЗ1','ПЗ2','ПЗ3','ПЗ5','ПЗ6','ПЗ7','ПЗ8','ПЗ9','ПЗ10','ПЗ11','ПЗ12','ПЗ13','ПЗ14','ПЗ15','ПЗ16','ПЗ17','ПЗ18','ПЗ19','ПЗ20','ПЗ21','ПЗ24','ПЗ25','ПЗ27','ПЗ28','ПЗ29'];
+                var names = ['ПЗ 1','ПЗ 2','ПЗ 3','ПЗ 5','ПЗ 6','ПЗ 7','ПЗ 8','ПЗ 9','ПЗ 10','ПЗ 11','ПЗ 12','ПЗ 13','ПЗ 14','ПЗ 15','ПЗ 16','ПЗ 17','ПЗ 18','ПЗ 19','ПЗ 20','ПЗ 21','ПЗ 24','ПЗ 25','ПЗ 27','ПЗ 28','ПЗ 29'];
                 for (var i = 0; i < cols.length; i++) {
                     tasks[names[i]] = {
                         status: getVal(cells[cols[i]]),
@@ -261,7 +261,7 @@
                 }
             } else if (type === 'ЛР') {
                 var cols = [4,6,8,10,12,14,16,18,20,22,24,26,28,30,32,34];
-                var names = ['ЛР1','ЛР2','ЛР3','ЛР4','ЛР5','ЛР6','ЛР7','ЛР8','ЛР9','ЛР10','ЛР11','ЛР12','ЛР13','ЛР14','ЛР15','ЛР16'];
+                var names = ['ЛР 1','ЛР 2','ЛР 3','ЛР 4','ЛР 5','ЛР 6','ЛР 7','ЛР 8','ЛР 9','ЛР 10','ЛР 11','ЛР 12','ЛР 13','ЛР 14','ЛР 15','ЛР 16'];
                 for (var i = 0; i < cols.length; i++) {
                     tasks[names[i]] = {
                         status: getVal(cells[cols[i]]),
@@ -276,10 +276,18 @@
             var status = task ? (task.status || '') : '';
             var grade = task ? (task.grade || '') : '';
             
-            // Определяем, что показывать
-            var isDebt = (status === '2' || status === 'н' || (!grade && !status) || grade === '' || grade === '0');
             var hasGrade = grade && !isNaN(parseFloat(grade)) && parseFloat(grade) > 0;
-            var isDone = hasGrade && !isDebt;
+            var isDebt = false;
+            var isDone = false;
+            
+            // Логика: "н" + оценка = сдано (не был, но сдал)
+            if (hasGrade && status !== '2') {
+                // Есть оценка и нет "2" — сдано
+                isDone = true;
+            } else if (status === '2' || status === 'н' || (!hasGrade && !status) || grade === '' || grade === '0') {
+                // "2" без оценки, "н" без оценки, пусто — долг
+                isDebt = true;
+            }
             
             var display = '—';
             var cls = 'grade-empty';
@@ -293,19 +301,7 @@
                 else if (g >= 3) cls = 'grade-3';
                 else cls = 'grade-2';
                 badge = '<span class="status-badge badge-done">✔</span>';
-            } else if (status === 'н') {
-                display = 'долг';
-                cls = 'grade-2';
-                badge = '<span class="status-badge badge-fail">✘</span>';
-            } else if (status === '2' && !grade) {
-                display = 'долг';
-                cls = 'grade-2';
-                badge = '<span class="status-badge badge-fail">✘</span>';
-            } else if (status === '2' && grade) {
-                display = grade;
-                cls = 'grade-2';
-                badge = '<span class="status-badge badge-fail">✘</span>';
-            } else if (!status && !grade) {
+            } else if (isDebt) {
                 display = 'долг';
                 cls = 'grade-2';
                 badge = '<span class="status-badge badge-fail">✘</span>';
