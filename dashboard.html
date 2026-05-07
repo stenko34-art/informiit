@@ -47,7 +47,6 @@
         
         document.getElementById('userName').textContent = user.name + ' (гр. ' + user.group + ')';
         
-        // Какие задания показывать (основные)
         var PZ_LIST = ['ПЗ1','ПЗ2','ПЗ3','ПЗ5','ПЗ6','ПЗ7','ПЗ8'];
         var LR_LIST = ['ЛР1','ЛР2','ЛР3','ЛР4','ЛР5','ЛР6','ЛР7'];
         
@@ -76,8 +75,6 @@
         
         function renderPage(student) {
             var tasks = student.tasks;
-            
-            // Считаем статистику
             var donePZ = 0, failPZ = 0, doneLR = 0, failLR = 0;
             
             PZ_LIST.forEach(function(id) {
@@ -94,7 +91,6 @@
             var h = '<h2>📊 Мои оценки</h2>';
             h += '<p class="text-muted">' + user.name + ' | Группа ' + user.group + '</p>';
             
-            // Сводка
             h += '<div class="summary">';
             h += '<div class="summary-card"><div class="num num-green">' + donePZ + '</div><div class="lbl">✅ ПЗ сдано</div></div>';
             h += '<div class="summary-card"><div class="num num-red">' + failPZ + '</div><div class="lbl">❌ ПЗ долги</div></div>';
@@ -102,7 +98,6 @@
             h += '<div class="summary-card"><div class="num num-red">' + failLR + '</div><div class="lbl">❌ ЛР долги</div></div>';
             h += '</div>';
             
-            // Практические занятия
             h += '<div class="section-title">📝 Практические занятия</div>';
             h += '<div class="task-grid">';
             PZ_LIST.forEach(function(id) {
@@ -110,7 +105,6 @@
             });
             h += '</div>';
             
-            // Лабораторные работы
             h += '<div class="section-title">🔬 Лабораторные работы</div>';
             h += '<div class="task-grid">';
             LR_LIST.forEach(function(id) {
@@ -127,9 +121,7 @@
         function renderCard(id, name, task) {
             var status = task ? (task.status || '') : '';
             var grade = task ? (task.grade || '') : '';
-            
-            var display = '—';
-            var cls = 'grade-empty';
+            var display = '—', cls = 'grade-empty';
             var badge = '<span class="status-badge badge-pending">Ожидает</span>';
             
             if (grade && status !== '2') {
@@ -153,6 +145,22 @@
             return '<div class="task-card">' +
                 '<h4>' + name + '</h4>' +
                 '<div class="grade ' + cls + '">' + display + '</div>' +
-                badge +
-                '</div>';
+                badge + '</div>';
         }
+        
+        function showError(msg) {
+            document.getElementById('mainContent').innerHTML = 
+                '<h2>📊 Мои оценки</h2>' +
+                '<p class="text-muted">' + user.name + ' | Группа ' + user.group + '</p>' +
+                '<div style="text-align:center;padding:40px;color:#dc2626;">' +
+                '<p>❌ ' + msg + '</p>' +
+                '<button class="btn btn-primary mt-2" onclick="loadData()">🔄 Попробовать снова</button></div>';
+        }
+        
+        function doLogout() {
+            sessionStorage.removeItem('currentUser');
+            window.location.href = 'index.html';
+        }
+    </script>
+</body>
+</html>
