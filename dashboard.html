@@ -6,21 +6,22 @@
     <title>Мои оценки — Информатика СПО</title>
     <link rel="stylesheet" href="css/style.css">
     <style>
-        .task-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-top:16px}
-        .task-card{border:2px solid #e2e8f0;border-radius:12px;padding:14px;text-align:center;background:white;transition:.2s}
-        .task-card:hover{box-shadow:0 4px 12px rgba(0,0,0,.1)}
-        .task-card h4{font-size:.8em;margin-bottom:6px;color:#64748b}
-        .task-card .grade{font-size:2em;font-weight:700;margin:6px 0}
+        .task-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px;margin-top:12px}
+        .task-card{border:2px solid #e2e8f0;border-radius:10px;padding:10px;text-align:center;background:white}
+        .task-card h4{font-size:.75em;margin-bottom:4px;color:#64748b}
+        .task-card .grade{font-size:1.6em;font-weight:700;margin:4px 0}
         .grade-5{color:#059669}.grade-4{color:#2563eb}.grade-3{color:#d97706}.grade-2{color:#dc2626}.grade-empty{color:#94a3b8}
-        .status-badge{display:inline-block;padding:3px 8px;border-radius:10px;font-size:.7em;font-weight:600}
+        .status-badge{display:inline-block;padding:2px 6px;border-radius:8px;font-size:.6em;font-weight:600;margin-top:2px}
         .badge-done{background:#ecfdf5;color:#065f46}
         .badge-fail{background:#fef2f2;color:#991b1b}
         .badge-pending{background:#f1f5f9;color:#475569}
-        .summary{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}
-        .summary-card{background:#f8fafc;border-radius:10px;padding:14px;text-align:center}
-        .summary-card .num{font-size:2em;font-weight:700}
-        .summary-card .lbl{font-size:.75em;color:#64748b}
+        .badge-retake{background:#fffbeb;color:#92400e}
+        .summary{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px}
+        .summary-card{background:#f8fafc;border-radius:8px;padding:10px;text-align:center}
+        .summary-card .num{font-size:1.5em;font-weight:700}
+        .summary-card .lbl{font-size:.65em;color:#64748b}
         .num-green{color:#059669}.num-red{color:#dc2626}.num-blue{color:#2563eb}
+        .section-title{margin:16px 0 8px;font-weight:700;font-size:.9em;color:#1e293b;border-bottom:2px solid #e2e8f0;padding-bottom:4px}
     </style>
 </head>
 <body>
@@ -34,7 +35,7 @@
 
     <div class="container">
         <main class="main-content" id="mainContent" style="width:100%;">
-            <div style="text-align:center;padding:40px;">🔄 Загрузка...</div>
+            <div style="text-align:center;padding:40px;">🔄 Загрузка данных из Google Таблиц...</div>
         </main>
     </div>
 
@@ -46,6 +47,19 @@
         
         document.getElementById('userName').textContent = user.name + ' (гр. ' + user.group + ')';
         
+        // Какие задания показывать (основные)
+        var PZ_LIST = ['ПЗ1','ПЗ2','ПЗ3','ПЗ5','ПЗ6','ПЗ7','ПЗ8'];
+        var LR_LIST = ['ЛР1','ЛР2','ЛР3','ЛР4','ЛР5','ЛР6','ЛР7'];
+        
+        var PZ_NAMES = {
+            'ПЗ1':'Аппаратное обеспечение','ПЗ2':'Файлы и папки','ПЗ3':'Локальная сеть',
+            'ПЗ5':'Интернет-сервисы','ПЗ6':'Антивирус','ПЗ7':'Архивация','ПЗ8':'Дискретизация'
+        };
+        var LR_NAMES = {
+            'ЛР1':'Браузер','ЛР2':'Поисковые системы','ЛР3':'Лицензионное ПО',
+            'ЛР4':'Атрибуты файлов','ЛР5':'Атрибуты файлов','ЛР6':'Внешние устройства','ЛР7':'Публикации'
+        };
+        
         loadData();
         
         function loadData() {
@@ -53,57 +67,92 @@
                 '<div style="text-align:center;padding:40px;">🔄 Загрузка данных из Google Таблиц...</div>';
             
             GoogleSheets.getStudentSheetData(user.name, user.group).then(function(student) {
-                if (student) {
-                    renderPage(student);
-                } else {
-                    document.getElementById('mainContent').innerHTML = 
-                        '<h2>📊 Мои оценки</h2>' +
-                        '<p class="text-muted">' + user.name + ' | Группа ' + user.group + '</p>' +
-                        '<div style="text-align:center;padding:40px;color:#dc2626;">' +
-                        '<p>❌ Данные не найдены</p>' +
-                        '<button class="btn btn-primary mt-2" onclick="loadData()">🔄 Обновить</button>' +
-                        '</div>';
-                }
-            }).catch(function(err) {
-                console.error(err);
-                document.getElementById('mainContent').innerHTML = 
-                    '<h2>📊 Мои оценки</h2>' +
-                    '<p class="text-muted">' + user.name + ' | Группа ' + user.group + '</p>' +
-                    '<div style="text-align:center;padding:40px;color:#dc2626;">' +
-                    '<p>❌ Ошибка загрузки</p>' +
-                    '<button class="btn btn-primary mt-2" onclick="loadData()">🔄 Обновить</button>' +
-                    '</div>';
+                if (student) renderPage(student);
+                else showError('Данные не найдены');
+            }).catch(function() {
+                showError('Ошибка загрузки');
             });
         }
         
         function renderPage(student) {
+            var tasks = student.tasks;
+            
+            // Считаем статистику
+            var donePZ = 0, failPZ = 0, doneLR = 0, failLR = 0;
+            
+            PZ_LIST.forEach(function(id) {
+                var t = tasks[id] || {};
+                if (t.grade && t.status !== '2') donePZ++;
+                if (t.status === '2' && !t.grade) failPZ++;
+            });
+            LR_LIST.forEach(function(id) {
+                var t = tasks[id] || {};
+                if (t.grade && t.status !== '2') doneLR++;
+                if (t.status === '2' && !t.grade) failLR++;
+            });
+            
             var h = '<h2>📊 Мои оценки</h2>';
             h += '<p class="text-muted">' + user.name + ' | Группа ' + user.group + '</p>';
             
-            // Показываем ФИО из таблицы
-            h += '<p style="font-size:.8em;color:#94a3b8;">✅ Данные загружены из Google Таблицы</p>';
+            // Сводка
+            h += '<div class="summary">';
+            h += '<div class="summary-card"><div class="num num-green">' + donePZ + '</div><div class="lbl">✅ ПЗ сдано</div></div>';
+            h += '<div class="summary-card"><div class="num num-red">' + failPZ + '</div><div class="lbl">❌ ПЗ долги</div></div>';
+            h += '<div class="summary-card"><div class="num num-green">' + doneLR + '</div><div class="lbl">✅ ЛР сдано</div></div>';
+            h += '<div class="summary-card"><div class="num num-red">' + failLR + '</div><div class="lbl">❌ ЛР долги</div></div>';
+            h += '</div>';
             
-            // Отладка: показываем сырые данные
-            h += '<details style="margin:12px 0;font-size:.8em;">';
-            h += '<summary>📋 Отладка: данные из таблицы</summary>';
-            h += '<pre style="background:#f8fafc;padding:10px;border-radius:6px;overflow-x:auto;font-size:.75em;">';
-            h += 'ФИО: ' + student.fio + '\n';
-            h += 'Заданий: ' + Object.keys(student.tasks).length + '\n\n';
-            for (var tid in student.tasks) {
-                var t = student.tasks[tid];
-                h += tid + ': статус="' + t.status + '", оценка="' + t.grade + '"\n';
-            }
-            h += '</pre></details>';
+            // Практические занятия
+            h += '<div class="section-title">📝 Практические занятия</div>';
+            h += '<div class="task-grid">';
+            PZ_LIST.forEach(function(id) {
+                h += renderCard(id, PZ_NAMES[id] || id, tasks[id]);
+            });
+            h += '</div>';
             
-            h += '<button class="btn btn-secondary btn-sm mt-1" onclick="loadData()">🔄 Обновить</button>';
+            // Лабораторные работы
+            h += '<div class="section-title">🔬 Лабораторные работы</div>';
+            h += '<div class="task-grid">';
+            LR_LIST.forEach(function(id) {
+                h += renderCard(id, LR_NAMES[id] || id, tasks[id]);
+            });
+            h += '</div>';
+            
+            h += '<button class="btn btn-secondary btn-sm mt-2" onclick="loadData()">🔄 Обновить</button>';
+            h += '<p style="font-size:.65em;color:#94a3b8;margin-top:8px;">Данные из Google Таблиц. Обновляется раз в 5 минут.</p>';
             
             document.getElementById('mainContent').innerHTML = h;
         }
         
-        function doLogout() {
-            sessionStorage.removeItem('currentUser');
-            window.location.href = 'index.html';
+        function renderCard(id, name, task) {
+            var status = task ? (task.status || '') : '';
+            var grade = task ? (task.grade || '') : '';
+            
+            var display = '—';
+            var cls = 'grade-empty';
+            var badge = '<span class="status-badge badge-pending">Ожидает</span>';
+            
+            if (grade && status !== '2') {
+                display = grade;
+                cls = 'grade-' + (['5','4','3'].includes(grade) ? grade : '4');
+                badge = '<span class="status-badge badge-done">Сдано</span>';
+            } else if (status === '2' && !grade) {
+                display = '2';
+                cls = 'grade-2';
+                badge = '<span class="status-badge badge-fail">Долг</span>';
+            } else if (status === '2' && grade) {
+                display = grade;
+                cls = 'grade-2';
+                badge = '<span class="status-badge badge-retake">Пересдача</span>';
+            } else if (status === 'н') {
+                display = 'н/а';
+                cls = 'grade-2';
+                badge = '<span class="status-badge badge-fail">Не сдано</span>';
+            }
+            
+            return '<div class="task-card">' +
+                '<h4>' + name + '</h4>' +
+                '<div class="grade ' + cls + '">' + display + '</div>' +
+                badge +
+                '</div>';
         }
-    </script>
-</body>
-</html>
