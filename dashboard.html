@@ -59,19 +59,28 @@
 
         loadData();
 
-        function loadData() {
-            document.getElementById('mainContent').innerHTML = '<div style="text-align:center;padding:40px;">🔄 Загрузка данных из Google Таблиц...</div>';
+        function loadData(forceRefresh) {
+            var cacheKey = 'cache_' + user.group;
+            var cached = sessionStorage.getItem(cacheKey);
             
+            if (cached && !forceRefresh) {
+                var data = JSON.parse(cached);
+                renderPage(data);
+                return;
+            }
+            
+            document.getElementById('mainContent').innerHTML = '<div style="text-align:center;padding:40px;">🔄 Загрузка данных из Google Таблиц...</div>';
+                    
             var sheetId = SHEET_IDS[user.group] || SHEET_IDS['102'];
             
             Promise.all([
                 fetch('https://docs.google.com/spreadsheets/d/' + sheetId + '/gviz/tq?tqx=out:json&sheet=ПЗ').then(function(r){return r.text();}),
-                fetch('https://docs.google.com/spreadsheets/d/' + sheetId + '/gviz/tq?tqx=out:json&sheet=ЛР').then(function(r){return r.text();}),
+                fetch('https://script.google.com/macros/s/AKfycbxYSBWV0DTfqlKEvi_gQjjUNxUfCNs7CF5zgZoKSKqpS8LLCSdUxWDwMENaQduf9gEv/exec?id=' + sheetId + '&sheet=ЛР').then(function(r){return r.text();}),
                 fetch('https://docs.google.com/spreadsheets/d/' + sheetId + '/gviz/tq?tqx=out:json&sheet=Допуск').then(function(r){return r.text();})
             ]).then(function(results) {
-                var pz = parseSheet(results[0]);
-                var lr = parseSheet(results[1]);
-                var dop = parseSheet(results[2]);
+                var pz = parseSheet(results[0], 'ПЗ');
+                var lr = parseSheet(results[1], 'ЛР');
+                var dop = parseSheet(results[2], 'Допуск');
                 
                 var search = user.name.toLowerCase().replace(/\s+/g, ' ').trim();
                 var pzRow = findRow(pz, search);
@@ -83,24 +92,122 @@
                     return;
                 }
                 
-                renderPage({ pz: pzRow, lr: lrRow, dop: dopRow });
+                var pageData = { pz: pzRow, lr: lrRow, dop: dopRow, pzSheet: pz, lrSheet: lr };
+                sessionStorage.setItem(cacheKey, JSON.stringify(pageData));
+                renderPage(pageData);
             }).catch(function(e) {
                 console.error(e);
                 showError('Ошибка загрузки данных');
             });
         }
 
-        function parseSheet(text) {
+        function parseSheetLR(text) {
+            var data = JSON.parse(text);
+            var students = [];
+
+            var taskCols = [
+                { col: 4,  name: '1' },
+                { col: 6,  name: '2' },
+                { col: 8,  name: '3' },
+                { col: 10, name: '4' },
+                { col: 12, name: '5' },
+                { col: 14, name: '6' },
+                { col: 16, name: '7' }
+            ];
+
+            // Динамические ЛР 8+ из строки 1
+            var headerRow = data[1] || [];
+            for (var c = 0; c < headerRow.length; c++) {
+                var val = String(headerRow[c] || '').trim().split('\n')[0].trim();
+                if (/^\d+$/.test(val) && parseInt(val) >= 8) {
+                    taskCols.push({ col: c, name: val });
+                }
+            }
+
+            taskCols.sort(function(a, b) {
+                return parseInt(a.name) - parseInt(b.name);
+            });
+
+            for (var i = 2; i < data.length; i++) {
+                var row = data[i];
+                var fio = row[3] ? String(row[3]).trim() : '';
+                if (!fio) continue;
+                // Конвертируем в формат {v, f}
+                var cells = row.map(function(v) {
+                    return { v: v, f: String(v) };
+                });
+                students.push({ fio: fio, cells: cells });
+            }
+
+            students._taskCols = taskCols;
+            return students;
+        }
+
+        function parseSheet(text, sheetType) {
+            if (sheetType === 'ЛР') {
+                return parseSheetLR(text);
+            }
             var json = JSON.parse(text.substring(text.indexOf('{'), text.lastIndexOf('}') + 1));
             var rows = json.table.rows;
             var students = [];
-            for (var i = 2; i < rows.length; i++) {
+
+            var headerRow = rows[0] ? rows[0].c : [];
+            var taskCols = [];
+
+            if (sheetType === 'ПЗ') {
+                taskCols.push({ col: 4, name: 'Вх.кон', single: true });
+                taskCols.push({ col: 6, name: '1' });
+                taskCols.push({ col: 8, name: '2' });
+                taskCols.push({ col: 10, name: '3' });
+                taskCols.push({ col: 36, name: 'Excel', single: true });
+            }
+
+            if (sheetType === 'ЛР') {
+                taskCols.push({ col: 4,  name: '1' });
+                taskCols.push({ col: 6,  name: '2' });
+                taskCols.push({ col: 8,  name: '3' });
+                taskCols.push({ col: 10, name: '4' });
+                taskCols.push({ col: 12, name: '5' });
+                taskCols.push({ col: 14, name: '6' });
+                taskCols.push({ col: 16, name: '7' });
+                taskCols.push({ col: 18, name: '8' });
+                taskCols.push({ col: 20, name: '9' });
+                taskCols.push({ col: 22, name: '10' });
+                taskCols.push({ col: 24, name: '11' });
+                taskCols.push({ col: 26, name: '12' });
+                taskCols.push({ col: 28, name: '13' });
+                taskCols.push({ col: 30, name: '14' });
+                taskCols.push({ col: 32, name: '15' });
+                taskCols.push({ col: 34, name: '16' });
+            }
+
+            for (var c = 0; c < headerRow.length; c++) {
+                var cell = headerRow[c];
+                var raw = cell ? (cell.v !== null && cell.v !== undefined ? cell.v : (cell.f || '')) : '';
+                var val = String(raw).trim().split('\n')[0].trim();
+                if (/^\d+$/.test(val)) {
+                    taskCols.push({ col: c, name: val });
+                }
+            }
+
+            var startRow = sheetType === 'ЛР' ? 1 : 1;
+            for (var i = startRow; i < rows.length; i++) {
                 var cells = rows[i].c;
                 if (!cells) continue;
                 var fio = cells[3] ? String(cells[3].v || '').trim() : '';
                 if (!fio) continue;
                 students.push({ fio: fio, cells: cells });
             }
+
+            taskCols.sort(function(a, b) {
+                var an = parseInt(a.name);
+                var bn = parseInt(b.name);
+                if (isNaN(an) && isNaN(bn)) return 0;
+                if (isNaN(an)) return -1; // нечисловые (Вх.кон, Excel) — в начало
+                if (isNaN(bn)) return 1;
+                return an - bn;
+            });
+            students._taskCols = taskCols;
             return students;
         }
 
@@ -121,36 +228,53 @@
             return String(v).trim();
         }
 
-        function extractTasks(row, type) {
+        function extractTasks(row, sheetData, prefix) {
             var tasks = {};
-            if (!row) return tasks;
+            if (!row || !sheetData._taskCols) return tasks;
             var cells = row.cells;
-            
-            if (type === 'ПЗ') {
-                var cols = [6,8,10,12,14,16,18,20,22,24,26,28,30,32,34,36,38,40,42,44,46,48,50,52,54];
-                var names = ['ПЗ 1','ПЗ 2','ПЗ 3','ПЗ 5','ПЗ 6','ПЗ 7','ПЗ 8','ПЗ 9','ПЗ 10','ПЗ 11','ПЗ 12','ПЗ 13','ПЗ 14','ПЗ 15','ПЗ 16','ПЗ 17','ПЗ 18','ПЗ 19','ПЗ 20','ПЗ 21','ПЗ 24','ПЗ 25','ПЗ 27','ПЗ 28','ПЗ 29'];
-                for (var i = 0; i < cols.length; i++) {
-                    tasks[names[i]] = { status: getVal(cells[cols[i]]), grade: getVal(cells[cols[i] + 1]) };
-                }
+            sheetData._taskCols.forEach(function(tc) {
+            if (tc.single) {
+                // Одна колонка — сама является оценкой
+                tasks[tc.name] = {
+                    status: '',
+                    grade: getVal(cells[tc.col])
+                };
             } else {
-                var cols = [4,6,8,10,12,14,16,18,20,22,24,26,28,30,32,34];
-                var names = ['ЛР 1','ЛР 2','ЛР 3','ЛР 4','ЛР 5','ЛР 6','ЛР 7','ЛР 8','ЛР 9','ЛР 10','ЛР 11','ЛР 12','ЛР 13','ЛР 14','ЛР 15','ЛР 16'];
-                for (var i = 0; i < cols.length; i++) {
-                    tasks[names[i]] = { status: getVal(cells[cols[i]]), grade: getVal(cells[cols[i] + 1]) };
-                }
+                tasks[prefix + ' ' + tc.name] = {
+                    status: getVal(cells[tc.col]),
+                    grade:  getVal(cells[tc.col + 1])
+                };
             }
+        });
             return tasks;
         }
 
         function renderPage(data) {
-            var pzTasks = extractTasks(data.pz, 'ПЗ');
-            var lrTasks = extractTasks(data.lr, 'ЛР');
+            var pzTasks = extractTasks(data.pz, data.pzSheet, 'ПЗ');
+            var lrTasks = extractTasks(data.lr, data.lrSheet, 'ЛР');
             var pzAll = Object.values(pzTasks);
             var lrAll = Object.values(lrTasks);
+
+            // Только работы которые реально есть в таблице
+            var pzKeys = Object.keys(pzTasks);
+            var lrKeys = Object.keys(lrTasks);
             var allTasks = pzAll.concat(lrAll);
             
             var done = allTasks.filter(function(t){ return t.grade && !isNaN(parseFloat(t.grade)) && parseFloat(t.grade) > 0 && t.status !== '2'; }).length;
-            var debts = allTasks.filter(function(t){ return t.status === '2' || t.status === 'н' || !t.grade || t.grade === '' || t.grade === '0'; }).length;
+            var debts = allTasks.filter(function(t){
+                var g = String(t.grade || '').toLowerCase();
+                var s = String(t.status || '').toLowerCase();
+                // Если есть любая пометка пропуска — это не долг
+                if (g === 'н' || g === 'н/б' || s === 'н' || s === 'н/б') return false;
+                // Долг — это если стоит '2' или ячейка пустая
+                return s === '2' || !g || g === '' || g === '0';
+            }).length;
+
+            var absents = allTasks.filter(function(t){
+                var g = String(t.grade || '').toLowerCase();
+                var s = String(t.status || '').toLowerCase();
+                return g === 'н' || g === 'н/б' || s === 'н' || s === 'н/б';
+            }).length;
             var total = allTasks.length;
             
             var pzGrades = []; pzAll.forEach(function(t){ if(t.grade && !isNaN(parseFloat(t.grade)) && parseFloat(t.grade)>0 && t.status!=='2') pzGrades.push(parseFloat(t.grade)); });
@@ -174,6 +298,7 @@
             h += '<div class="stats-grid">';
             h += '<div class="stat-card"><div class="val c-green">' + done + '/' + total + '</div><div class="lbl">Сдано работ</div></div>';
             h += '<div class="stat-card"><div class="val c-red">' + debts + '</div><div class="lbl">Долгов</div></div>';
+            h += '<div class="stat-card"><div class="val c-yellow">' + absents + '</div><div class="lbl">Пропусков</div></div>';
             h += '<div class="stat-card"><div class="val c-blue">' + (avgAll||'—') + '</div><div class="lbl">Средний балл</div></div>';
             h += '<div class="stat-card"><div class="val c-yellow">' + (avgPZ||'—') + ' / ' + (avgLR||'—') + '</div><div class="lbl">ПЗ / ЛР</div></div>';
             if (dopText) h += '<div class="stat-card"><div class="val" style="font-size:1.2em;color:#6366f1;">' + dopText + '</div><div class="lbl">Допуск</div></div>';
@@ -185,26 +310,40 @@
             h += '<div class="progress-bar"><div class="progress-fill ' + fc + '" style="width:' + pct + '%"></div></div>';
 
             h += '<div class="section-title">Практические занятия (ср. балл: ' + (avgPZ||'—') + ')</div><div class="task-grid">';
-            ['ПЗ 1','ПЗ 2','ПЗ 3','ПЗ 5','ПЗ 6','ПЗ 7','ПЗ 8','ПЗ 9','ПЗ 10','ПЗ 11','ПЗ 12','ПЗ 13','ПЗ 14','ПЗ 15','ПЗ 16','ПЗ 17','ПЗ 18','ПЗ 19','ПЗ 20','ПЗ 21','ПЗ 24','ПЗ 25','ПЗ 27','ПЗ 28','ПЗ 29'].forEach(function(id){ if(pzTasks[id]!==undefined) h+=renderCard(id,pzTasks[id]); });
+            pzKeys.forEach(function(id){ h += renderCard(id, pzTasks[id]); });
             h += '</div>';
 
             h += '<div class="section-title">Лабораторные работы (ср. балл: ' + (avgLR||'—') + ')</div><div class="task-grid">';
-            ['ЛР 1','ЛР 2','ЛР 3','ЛР 4','ЛР 5','ЛР 6','ЛР 7','ЛР 8','ЛР 9','ЛР 10','ЛР 11','ЛР 12','ЛР 13','ЛР 14','ЛР 15','ЛР 16'].forEach(function(id){ if(lrTasks[id]!==undefined) h+=renderCard(id,lrTasks[id]); });
+            lrKeys.forEach(function(id){ h += renderCard(id, lrTasks[id]); });
             h += '</div>';
 
-            h += '<button class="btn btn-secondary btn-sm mt-2" onclick="loadData()">Обновить</button>';
+            h += '<button class="btn btn-secondary btn-sm mt-2" onclick="loadData(true)">Обновить</button>';
             document.getElementById('mainContent').innerHTML = h;
         }
 
         function renderCard(id, task) {
             var status = task ? (task.status||'') : '';
             var grade = task ? (task.grade||'') : '';
+            var gVal = String(grade || '').toLowerCase();
+            var sVal = String(status || '').toLowerCase();
+
+            var isAbsent = gVal === 'н' || gVal === 'н/б' || sVal === 'н' || sVal === 'н/б';
             var hasGrade = grade && !isNaN(parseFloat(grade)) && parseFloat(grade) > 0;
-            var isDone = hasGrade && status !== '2';
-            var isDebt = !isDone;
-            var display = isDone ? grade : 'долг';
-            var cls = isDone ? ('grade-' + (parseFloat(grade)>=5?'5':parseFloat(grade)>=4?'4':parseFloat(grade)>=3?'3':'2')) : 'grade-2';
-            var badge = isDone ? '<span class="status-badge badge-done">✔</span>' : '<span class="status-badge badge-fail">✘</span>';
+            var isDone = hasGrade && sVal !== '2' && !isAbsent;
+            var display, cls, badge;
+            if (isAbsent) {
+                display = hasGrade ? grade : 'н/б';
+                cls = hasGrade ? ('grade-' + (parseFloat(grade)>=5?'5':parseFloat(grade)>=4?'4':parseFloat(grade)>=3?'3':'2')) : 'grade-empty';
+                badge = '<span class="status-badge" style="background:#fef9c3;color:#854d0e;">пропуск</span>';
+            } else if (isDone) {
+                display = grade;
+                cls = 'grade-' + (parseFloat(grade)>=5?'5':parseFloat(grade)>=4?'4':parseFloat(grade)>=3?'3':'2');
+                badge = '<span class="status-badge badge-done">✔</span>';
+            } else {
+                display = 'долг';
+                cls = 'grade-2';
+                badge = '<span class="status-badge badge-fail">✘</span>';
+            }
             return '<div class="task-card"><h4>' + id + '</h4><div class="grade ' + cls + '">' + display + '</div>' + badge + '</div>';
         }
 
