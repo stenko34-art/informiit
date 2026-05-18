@@ -214,7 +214,7 @@
             document.getElementById('tableBody').innerHTML = '<tr><td colspan="7" style="text-align:center;padding:40px;color:#94a3b8;">🔄 Загружаем данные группы ' + group + '...</td></tr>';
  
             var sheetId = SHEET_IDS[group];
-            var scriptUrl = 'https://script.google.com/macros/s/AKfycbxYSBWV0DTfqlKEvi_gQjjUNxUfCNs7CF5zgZoKSKqpS8LLCSdUxWDwMENaQduf9gEv/exec';
+            var scriptUrl = 'https://script.google.com/macros/s/AKfycbzwO_i82RM5TunsRMw9flo0mvHxFVsNMbUiSlBhwzjmcInoJGOJKB3xgi4rfcIjkaV8/exec';
             var fetches = [
                 fetch('https://docs.google.com/spreadsheets/d/' + sheetId + '/gviz/tq?tqx=out:json&sheet=%D0%9F%D0%97&r=' + Date.now()).then(function(r){return r.text();}),
                 fetch(scriptUrl + '?id=' + sheetId + '&sheet=ЛР').then(function(r){return r.text();}).catch(function(){ return null; })
