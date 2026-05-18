@@ -6,29 +6,21 @@
     <title>Панель преподавателя — Информатика СПО</title>
     <link rel="stylesheet" href="css/style.css">
     <style>
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 16px;
-            margin-bottom: 24px;
-        }
-        .stat-card {
-            background: white;
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            padding: 20px;
-            text-align: center;
-        }
-        .stat-card .stat-value { font-size: 2em; font-weight: 700; color: var(--primary); }
-        .stat-card .stat-label { color: var(--text-secondary); font-size: 0.9em; margin-top: 4px; }
-        .group-filter { margin-bottom: 20px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-        .group-filter select { padding: 8px 16px; border: 1px solid var(--border); border-radius: var(--radius-sm); }
-        .table-container { overflow-x: auto; }
-        .btn-sm { padding: 6px 14px; font-size: 0.85em; }
-        .green { color: #059669; font-weight: 600; }
-        .yellow { color: #d97706; }
-        .red { color: #dc2626; }
-        .gray { color: #94a3b8; }
+        .stats-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:24px; }
+        .stat-card { background:white; border:1px solid var(--border); border-radius:var(--radius); padding:20px; text-align:center; }
+        .stat-card .stat-value { font-size:2em; font-weight:700; color:var(--primary); }
+        .stat-card .stat-label { color:var(--text-secondary); font-size:0.9em; margin-top:4px; }
+        .group-filter { margin-bottom:20px; display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+        .group-filter select { padding:8px 16px; border:1px solid var(--border); border-radius:var(--radius-sm); }
+        .table-container { overflow-x:auto; }
+        .btn-sm { padding:6px 14px; font-size:0.85em; }
+        .progress-bar { background:#e2e8f0; border-radius:4px; height:6px; overflow:hidden; margin-top:4px; }
+        .progress-fill { height:6px; border-radius:4px; }
+        .fill-green { background:#059669; } .fill-yellow { background:#d97706; } .fill-red { background:#dc2626; }
+        .avg-5 { color:#059669; font-weight:700; } .avg-4 { color:#2563eb; font-weight:700; }
+        .avg-3 { color:#d97706; font-weight:700; } .avg-2 { color:#dc2626; font-weight:700; }
+        .badge-absent { background:#fef9c3; color:#854d0e; padding:2px 6px; border-radius:6px; font-size:0.8em; }
+        .badge-debt { background:#fef2f2; color:#991b1b; padding:2px 6px; border-radius:6px; font-size:0.8em; }
     </style>
 </head>
 <body>
@@ -36,39 +28,25 @@
         <h1>👨‍🏫 Панель преподавателя — Информатика СПО</h1>
         <div class="user-block">
             <span id="adminName"></span>
-            <button class="btn btn-outline" onclick="logout()">🚪 Выйти</button>
+            <button class="btn btn-outline" onclick="doLogout()">🚪 Выйти</button>
         </div>
     </header>
-
+ 
     <div class="container" style="flex-direction:column;">
         <div class="main-content" style="width:100%;">
             <h2>📊 Результаты студентов</h2>
-            
-            <!-- Статистика -->
-            <div class="stats-grid" id="statsGrid">
-                <div class="stat-card">
-                    <div class="stat-value" id="statTotal">0</div>
-                    <div class="stat-label">Всего студентов</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-value" id="statActive">0</div>
-                    <div class="stat-label">Приступили</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-value" id="statAvg">0</div>
-                    <div class="stat-label">Средний балл</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-value" id="statDone">0</div>
-                    <div class="stat-label">Всё сдали</div>
-                </div>
+ 
+            <div class="stats-grid">
+                <div class="stat-card"><div class="stat-value" id="statTotal">0</div><div class="stat-label">Всего студентов</div></div>
+                <div class="stat-card"><div class="stat-value" id="statAvg">—</div><div class="stat-label">Средний балл</div></div>
+                <div class="stat-card"><div class="stat-value" id="statDebts">0</div><div class="stat-label">С долгами</div></div>
+                <div class="stat-card"><div class="stat-value" id="statAbsents">0</div><div class="stat-label">С пропусками</div></div>
             </div>
-            
-            <!-- Фильтр по группам -->
+ 
             <div class="group-filter">
                 <label><b>Группа:</b></label>
-                <select id="groupFilter" onchange="renderAll()">
-                    <option value="all">Все группы</option>
+                <select id="groupSelect" onchange="loadGroup()">
+                    <option value="">— выберите группу —</option>
                     <option value="101">101</option>
                     <option value="102">102</option>
                     <option value="103">103</option>
@@ -76,259 +54,269 @@
                     <option value="105">105</option>
                     <option value="106">106</option>
                     <option value="107">107</option>
+                    <option value="108">108</option>
                 </select>
-                
-                <button class="btn btn-primary" onclick="exportToCSV()">
-                    📥 Экспорт в Excel
-                </button>
-                <button class="btn btn-secondary" onclick="exportFullReport()">
-                    📄 Полный отчёт
-                </button>
-                <button class="btn btn-danger" onclick="resetAllData()" style="margin-left:8px;">
-                    🗑️ Сбросить все данные
-                </button>
+                <button class="btn btn-secondary btn-sm" onclick="loadGroup(true)">🔄 Обновить</button>
+                <button class="btn btn-primary btn-sm" onclick="exportToExcel()">📥 Выгрузить в Excel</button>
             </div>
-            
-            <!-- Таблица результатов -->
+ 
             <div class="table-container">
-                <table id="resultsTable">
+                <table id="resultsTable" style="width:100%;border-collapse:collapse;background:white;border-radius:var(--radius);overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.08);">
                     <thead>
-                        <tr>
-                            <th>№</th>
-                            <th>Группа</th>
-                            <th>ФИО</th>
-                            <th>Логин</th>
-                            <th>ПЗ1</th>
-                            <th>ПЗ2</th>
-                            <th>ПЗ3</th>
-                            <th>ПЗ5</th>
-                            <th>ПЗ6</th>
-                            <th>ПЗ7</th>
-                            <th>ПЗ8</th>
-                            <th>Всего</th>
-                            <th>Выполнено</th>
+                        <tr id="tableHead">
+                            <th style="background:#1e293b;color:white;padding:10px 12px;text-align:left;">№</th>
+                            <th style="background:#1e293b;color:white;padding:10px 12px;text-align:left;">ФИО</th>
+                            <th style="background:#1e293b;color:white;padding:10px 12px;text-align:left;">Сдано</th>
+                            <th style="background:#1e293b;color:white;padding:10px 12px;text-align:left;">Ср. балл</th>
+                            <th style="background:#1e293b;color:white;padding:10px 12px;text-align:left;">Долги</th>
+                            <th style="background:#1e293b;color:white;padding:10px 12px;text-align:left;">Пропуски</th>
+                            <th style="background:#1e293b;color:white;padding:10px 12px;text-align:left;">Прогресс</th>
                         </tr>
                     </thead>
                     <tbody id="tableBody">
-                        <tr><td colspan="13" style="text-align:center;padding:40px;color:#94a3b8;">
-                            Нет данных о студентах. Возможно, ни один студент ещё не входил в систему.
-                        </td></tr>
+                        <tr><td colspan="7" style="text-align:center;padding:40px;color:#94a3b8;">Выберите группу</td></tr>
                     </tbody>
                 </table>
             </div>
         </div>
     </div>
-
-    <!-- Загружаем список студентов и систему авторизации -->
-    <script src="data/students.js"></script>
+ 
     <script src="js/auth.js"></script>
-    
     <script>
-        // Проверка авторизации
-        const user = checkAuth();
-        if (!user || !user.isAdmin) {
-            alert('Доступ запрещён!');
-            window.location.href = 'index.html';
-        }
-        
+        var user = checkAuth();
+        if (!user || !user.isAdmin) { alert('Доступ запрещён!'); window.location.href = 'index.html'; }
         document.getElementById('adminName').textContent = user.name;
-        
-        // Задания
-        const TASKS = {
-            pz1: { name: 'ПЗ1', max: 16 },
-            pz2: { name: 'ПЗ2', max: 15 },
-            pz3: { name: 'ПЗ3', max: 24 },
-            pz5: { name: 'ПЗ5', max: 5 },
-            pz6: { name: 'ПЗ6', max: 5 },
-            pz7: { name: 'ПЗ7', max: 16 },
-            pz8: { name: 'ПЗ8', max: 20 }
+ 
+        var SHEET_IDS = {
+            '101':'1e4fcZ6J6fHfsvb6xca8lP5AwSRT2t7b02GcHEZfTmwU',
+            '102':'1AeNAFAkY1EDD4NfVUmk04j2nqZK3l2ltdXuDNX6bB-Q',
+            '103':'1LSe4uS98lWDNyjigS028Kn4lV42u7N2DUjyJo3y3RHc',
+            '104':'1Z8uVSazOeBtclHgIBsYEBFCD_RikTjPzQyjyAZF2t3Y',
+            '105':'1Zga2Kn2BjzL1RCidFiNDbDtQF7IbLZzdZ8AE7AXM9fw',
+            '106':'1fNXJCnmJ_szR50v2RfPKx_xR2gHDL44hr7SxHI1oLgo',
+            '107':'1m-D6b57CdSPDEw6vcevvVMB4twmJReLa8xS4qyMFJ2Y',
+            '108':'1qwWCSk-EDVq1amZ3Hn8fKsJULBkthr8lr9_x68vjlsY'
         };
         
-        const TOTAL_TASKS = Object.keys(TASKS).length;
-        
-        // Получение списка студентов с результатами
-        function getStudentsWithResults() {
-            const students = [];
-            
-            // Проходим по ВСЕМ студентам из students.js
-            for (let [login, userData] of Object.entries(STUDENTS)) {
-                if (userData.isAdmin) continue; // пропускаем админа
-                
-                const results = resultsData[login]?.tasks || {};
-                
-                // Считаем выполненные задания (те, где баллы > 0)
-                let totalDone = 0;
-                let totalScore = 0;
-                
-                Object.entries(TASKS).forEach(([tid, task]) => {
-                    if (results[tid] && results[tid].score !== null && results[tid].score !== undefined) {
-                        totalDone++;
-                        totalScore += results[tid].score;
-                    }
-                });
-                
-                students.push({
-                    login: login,
-                    name: userData.name,
-                    group: userData.group,
-                    results: results,
-                    totalDone: totalDone,
-                    totalScore: totalScore,
-                    lastLogin: resultsData[login]?.lastLogin || null
-                });
+        var PZ_FIXED = [
+            { col: 4, name: 'Вх.кон', single: true },
+            { col: 6, name: '1' }, { col: 8, name: '2' }, { col: 10, name: '3' },
+            { col: 36, name: 'Excel', single: true }
+        ];
+ 
+        function getVal(cell) {
+            if (!cell) return '';
+            var v = cell.v;
+            if (v === null || v === undefined) v = cell.f || '';
+            return String(v).trim();
+        }
+ 
+        function parsePZ(text) {
+            var json = JSON.parse(text.substring(text.indexOf('{'), text.lastIndexOf('}') + 1));
+            var rows = json.table.rows;
+            var headerRow = rows[0] ? rows[0].c : [];
+            var taskCols = PZ_FIXED.map(function(c){ return Object.assign({}, c); });
+            for (var c = 0; c < headerRow.length; c++) {
+                var cell = headerRow[c];
+                var raw = cell ? (cell.v !== null && cell.v !== undefined ? cell.v : (cell.f || '')) : '';
+                var val = String(raw).trim().split('\n')[0].split(' ')[0].trim();
+                if (/^\d+$/.test(val)) taskCols.push({ col: c, name: val });
             }
-            
-            // Сортируем: сначала по группе, потом по фамилии
-            students.sort((a, b) => {
-                if (a.group !== b.group) return a.group.localeCompare(b.group);
-                return a.name.localeCompare(b.name);
+            taskCols.sort(function(a, b) {
+                var an = parseInt(a.name), bn = parseInt(b.name);
+                if (isNaN(an) && isNaN(bn)) return 0;
+                if (isNaN(an)) return -1; if (isNaN(bn)) return 1;
+                return an - bn;
             });
-            
-            return students;
-        }
-        
-        // Фильтр по группе
-        function filterByGroup(students) {
-            const group = document.getElementById('groupFilter').value;
-            if (group === 'all') return students;
-            return students.filter(s => s.group === group);
-        }
-        
-        // Обновление статистики
-        function updateStats(students) {
-            const total = students.length;
-            const active = students.filter(s => s.totalDone > 0).length;
-            const avgScore = total > 0 ? Math.round(students.reduce((sum, s) => sum + s.totalScore, 0) / total) : 0;
-            const completed = students.filter(s => s.totalDone === TOTAL_TASKS).length;
-            
-            document.getElementById('statTotal').textContent = total;
-            document.getElementById('statActive').textContent = active;
-            document.getElementById('statAvg').textContent = avgScore;
-            document.getElementById('statDone').textContent = completed;
-        }
-        
-        // Рендеринг таблицы
-        function renderTable(students) {
-            if (students.length === 0) {
-                document.getElementById('tableBody').innerHTML = `
-                    <tr><td colspan="13" style="text-align:center;padding:40px;color:#94a3b8;">
-                        Нет студентов в выбранной группе.
-                    </td></tr>`;
-                return;
+            var students = [];
+            for (var i = 1; i < rows.length; i++) {
+                var cells = rows[i].c;
+                if (!cells) continue;
+                var fio = cells[3] ? String(cells[3].v || '').trim() : '';
+                if (!fio) continue;
+                var tasks = {};
+                taskCols.forEach(function(tc) {
+                    if (tc.single) tasks[tc.name] = { status: '', grade: getVal(cells[tc.col]) };
+                    else tasks['ПЗ ' + tc.name] = { status: getVal(cells[tc.col]), grade: getVal(cells[tc.col + 1]) };
+                });
+                students.push({ fio: fio, tasks: tasks });
             }
-            
-            let html = '';
-            students.forEach((student, i) => {
-                html += `<tr>
-                    <td>${i + 1}</td>
-                    <td><b>${student.group}</b></td>
-                    <td style="text-align:left;">${student.name}</td>
-                    <td><code>${student.login}</code></td>`;
-                
-                Object.keys(TASKS).forEach(tid => {
-                    const result = student.results[tid];
-                    if (result && result.score !== null && result.score !== undefined) {
-                        const pct = result.percent || Math.round(result.score / TASKS[tid].max * 100);
-                        const cls = pct >= 80 ? 'green' : pct >= 50 ? 'yellow' : 'red';
-                        html += `<td class="${cls}">${result.score}/${TASKS[tid].max}</td>`;
-                    } else {
-                        html += `<td class="gray">—</td>`;
-                    }
-                });
-                
-                html += `<td style="font-weight:600;">${student.totalScore}</td>
-                    <td>${student.totalDone}/${TOTAL_TASKS}</td>
-                </tr>`;
-            });
-            
-            document.getElementById('tableBody').innerHTML = html;
+            return { students: students, count: taskCols.length };
         }
-        
-        // Главная функция рендеринга
-        function renderAll() {
-            const allStudents = getStudentsWithResults();
-            const filtered = filterByGroup(allStudents);
-            updateStats(filtered);
-            renderTable(filtered);
-        }
-        
-        // Экспорт в CSV (Excel)
-        function exportToCSV() {
-            const students = filterByGroup(getStudentsWithResults());
-            
-            let csv = '\uFEFF№;Группа;ФИО;Логин;';
-            Object.values(TASKS).forEach(t => csv += t.name + ';');
-            csv += 'Всего баллов;Выполнено\n';
-            
-            students.forEach((s, i) => {
-                csv += `${i+1};${s.group};${s.name};${s.login};`;
-                Object.keys(TASKS).forEach(tid => {
-                    const r = s.results[tid];
-                    csv += (r && r.score !== null ? r.score : '') + ';';
-                });
-                csv += `${s.totalScore};${s.totalDone}\n`;
-            });
-            
-            downloadFile(csv, 'results.csv', 'text/csv;charset=utf-8;');
-        }
-        
-        // Экспорт полного отчёта
-        function exportFullReport() {
-            const students = filterByGroup(getStudentsWithResults());
-            
-            let report = 'ОТЧЁТ ПО УСПЕВАЕМОСТИ\n';
-            report += 'Дата: ' + new Date().toLocaleDateString() + '\n';
-            report += '='.repeat(50) + '\n\n';
-            
-            const groups = [...new Set(students.map(s => s.group))].sort();
-            
-            if (groups.length === 0) {
-                report += 'Нет данных для отображения.\n';
+ 
+        function parseLR(text) {
+            var data = JSON.parse(text);
+            var students = [];
+
+            var taskCols = [
+                { col: 4,  name: '1' }, { col: 6,  name: '2' }, { col: 8,  name: '3' },
+                { col: 10, name: '4' }, { col: 12, name: '5' }, { col: 14, name: '6' }, { col: 16, name: '7' }
+            ];
+
+            var headerRow = data[1] || [];
+            for (var c = 0; c < headerRow.length; c++) {
+                var val = String(headerRow[c] || '').trim().split('\n')[0].trim();
+                if (/^\d+$/.test(val) && parseInt(val) >= 8) {
+                    taskCols.push({ col: c, name: val });
+                }
             }
-            
-            groups.forEach(group => {
-                report += `ГРУППА ${group}\n${'-'.repeat(30)}\n`;
-                const groupStudents = students.filter(s => s.group === group);
-                
-                groupStudents.forEach((s, i) => {
-                    report += `${i+1}. ${s.name} (${s.login})\n`;
-                    report += `   Выполнено: ${s.totalDone}/${TOTAL_TASKS}\n`;
-                    report += `   Всего баллов: ${s.totalScore}\n`;
-                    Object.entries(TASKS).forEach(([tid, task]) => {
-                        const r = s.results[tid];
-                        const status = (r && r.score !== null) ? `${r.score}/${task.max}` : 'не выполнено';
-                        report += `   ${task.name}: ${status}\n`;
-                    });
-                    report += '\n';
+            taskCols.sort(function(a, b){ return parseInt(a.name) - parseInt(b.name); });
+
+            for (var i = 2; i < data.length; i++) {
+                var row = data[i];
+                var fio = row[3] ? String(row[3]).trim() : '';
+                if (!fio) continue;
+                var tasks = {};
+                taskCols.forEach(function(tc) {
+                    var status = String(row[tc.col] || '').trim();
+                    var grade = String(row[tc.col + 1] || '').trim();
+                    tasks['ЛР ' + tc.name] = { status: status, grade: grade };  
                 });
-                report += '\n';
+                students.push({ fio: fio, tasks: tasks });
+            }
+            return { students: students, count: taskCols.length };
+        }
+ 
+        function calcStudent(tasks) {
+            var all = Object.values(tasks);
+            var grades = [], debts = 0, absents = 0, done = 0;
+            all.forEach(function(t) {
+                var g = t.grade || '', s = t.status || '';
+                var isAbsent = g === 'н' || g === 'Н' || g === 'н/б' || s === 'н' || s === 'Н' || s === 'н/б';
+                var hasGrade = g && !isNaN(parseFloat(g)) && parseFloat(g) > 0;
+                var isDone = hasGrade && s !== '2';
+                if (isAbsent) { absents++; if (hasGrade) { grades.push(parseFloat(g)); done++; } }
+                else if (isDone) { grades.push(parseFloat(g)); done++; }
+                else debts++;
+            });
+            var avg = grades.length ? Math.round(grades.reduce(function(a,b){return a+b;},0)/grades.length*10)/10 : 0;
+            return { done: done, total: all.length, debts: debts, absents: absents, avg: avg };
+        }
+ 
+        function avgClass(avg) {
+            if (!avg) return '';
+            if (avg >= 4.5) return 'avg-5';
+            if (avg >= 3.5) return 'avg-4';
+            if (avg >= 2.5) return 'avg-3';
+            return 'avg-2';
+        }
+ 
+        function loadGroup(forceRefresh) {
+            var group = document.getElementById('groupSelect').value;
+            if (!group) return;
+ 
+            var cacheKey = 'admin_cache_' + group;
+            if (!forceRefresh) {
+                var cached = sessionStorage.getItem(cacheKey);
+                if (cached) { renderTable(JSON.parse(cached)); return; }
+            }
+ 
+            document.getElementById('tableBody').innerHTML = '<tr><td colspan="7" style="text-align:center;padding:40px;color:#94a3b8;">🔄 Загружаем данные группы ' + group + '...</td></tr>';
+ 
+            var sheetId = SHEET_IDS[group];
+            var scriptUrl = 'https://script.google.com/macros/s/AKfycbxYSBWV0DTfqlKEvi_gQjjUNxUfCNs7CF5zgZoKSKqpS8LLCSdUxWDwMENaQduf9gEv/exec';
+            var fetches = [
+                fetch('https://docs.google.com/spreadsheets/d/' + sheetId + '/gviz/tq?tqx=out:json&sheet=%D0%9F%D0%97&r=' + Date.now()).then(function(r){return r.text();}),
+                fetch(scriptUrl + '?id=' + sheetId + '&sheet=ЛР').then(function(r){return r.text();}).catch(function(){ return null; })
+            ];
+ 
+            Promise.all(fetches).then(function(results) {
+                var pzData = parsePZ(results[0]);
+                var lrData = results[1] ? parseLR(results[1]) : { students: [], count: 0 };
+ 
+                var map = {};
+                pzData.students.forEach(function(s){ map[s.fio] = { fio: s.fio, tasks: Object.assign({}, s.tasks) }; });
+                lrData.students.forEach(function(s){
+                    if (!map[s.fio]) map[s.fio] = { fio: s.fio, tasks: s.tasks };
+                    else Object.assign(map[s.fio].tasks, s.tasks);
+                });
+                var students = Object.values(map);
+                students.sort(function(a, b){ return a.fio.localeCompare(b.fio, 'ru'); });
+                students.forEach(function(s){ s.calc = calcStudent(s.tasks); });
+ 
+                var result = { students: students, pzCount: pzData.count, lrCount: lrData.count };
+                sessionStorage.setItem(cacheKey, JSON.stringify(result));
+                renderTable(result);
+            }).catch(function(e) {
+                console.error(e);
+                document.getElementById('tableBody').innerHTML = '<tr><td colspan="7" style="text-align:center;padding:40px;color:#dc2626;">❌ Ошибка загрузки</td></tr>';
+            });
+        }
+ 
+        function renderTable(result) {
+            var students = result.students;
+            var allAvgs = [], withDebts = 0, withAbsents = 0;
+            students.forEach(function(s) {
+                if (!s.calc) s.calc = calcStudent(s.tasks);
+                if (s.calc.avg) allAvgs.push(s.calc.avg);
+                if (s.calc.debts > 0) withDebts++;
+                if (s.calc.absents > 0) withAbsents++;
+            });
+            var groupAvg = allAvgs.length ? Math.round(allAvgs.reduce(function(a,b){return a+b;},0)/allAvgs.length*10)/10 : 0;
+ 
+            document.getElementById('statTotal').textContent = students.length;
+            document.getElementById('statAvg').textContent = groupAvg || '—';
+            document.getElementById('statDebts').textContent = withDebts;
+            document.getElementById('statAbsents').textContent = withAbsents;
+ 
+            var h = '';
+            students.forEach(function(s, i) {
+                var c = s.calc;
+                var pct = c.total ? Math.round(c.done/c.total*100) : 0;
+                var fc = pct>=80?'fill-green':pct>=50?'fill-yellow':'fill-red';
+                h += '<tr style="border-bottom:1px solid #e2e8f0;">';
+                h += '<td style="padding:10px 12px;">' + (i+1) + '</td>';
+                h += '<td style="padding:10px 12px;"><b>' + s.fio + '</b></td>';
+                h += '<td style="padding:10px 12px;">' + c.done + ' / ' + c.total + '</td>';
+                h += '<td style="padding:10px 12px;" class="' + avgClass(c.avg) + '">' + (c.avg||'—') + '</td>';
+                h += '<td style="padding:10px 12px;">' + (c.debts>0?'<span class="badge-debt">'+c.debts+'</span>':'<span style="color:#059669;">0</span>') + '</td>';
+                h += '<td style="padding:10px 12px;">' + (c.absents>0?'<span class="badge-absent">'+c.absents+'</span>':'0') + '</td>';
+                h += '<td style="padding:10px 12px;min-width:120px;">' + pct + '%<div class="progress-bar"><div class="progress-fill ' + fc + '" style="width:'+pct+'%"></div></div></td>';
+                h += '</tr>';
+            });
+            document.getElementById('tableBody').innerHTML = h || '<tr><td colspan="7" style="text-align:center;padding:40px;color:#94a3b8;">Нет данных</td></tr>';
+        }
+ 
+        function exportToExcel() {
+            var group = document.getElementById('groupSelect').value;
+            if (!group) { alert('Выберите группу'); return; }
+            
+            var cacheKey = 'admin_cache_' + group;
+            var cached = sessionStorage.getItem(cacheKey);
+            if (!cached) { alert('Сначала загрузите данные группы'); return; }
+            
+            var result = JSON.parse(cached);
+            var students = result.students;
+            
+            // BOM для корректного отображения кириллицы в Excel
+            var csv = '\uFEFF';
+            csv += '№;ФИО;Сдано работ;Всего работ;Процент;Средний балл;Долги;Пропуски\n';
+            
+            students.forEach(function(s, i) {
+                if (!s.calc) s.calc = calcStudent(s.tasks);
+                var c = s.calc;
+                var pct = c.total ? Math.round(c.done/c.total*100) : 0;
+                csv += (i+1) + ';';
+                csv += s.fio + ';';
+                csv += c.done + ';';
+                csv += c.total + ';';
+                csv += pct + '%;';
+                csv += (c.avg ? String(c.avg).replace('.', ',') : '—') + ';';
+                csv += c.debts + ';';
+                csv += c.absents + '\n';
             });
             
-            downloadFile(report, 'full_report.txt', 'text/plain;charset=utf-8;');
-        }
-        
-        // Сброс всех данных
-        function resetAllData() {
-            if (!confirm('ВНИМАНИЕ! Будут удалены ВСЕ результаты студентов. Продолжить?')) return;
-            if (!confirm('Точно? Это действие нельзя отменить!')) return;
-            
-            localStorage.removeItem('itResults');
-            resultsData = {};
-            alert('Все данные сброшены.');
-            renderAll();
-        }
-        
-        // Скачивание файла
-        function downloadFile(content, filename, type) {
-            const blob = new Blob([content], { type });
-            const link = document.createElement('a');
+            var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            var link = document.createElement('a');
             link.href = URL.createObjectURL(blob);
-            link.download = filename;
+            link.download = 'группа_' + group + '_' + new Date().toLocaleDateString('ru') + '.csv';
             link.click();
         }
-        
-        // Загрузка при открытии
-        renderAll();
+
+        function doLogout() {
+            sessionStorage.removeItem('currentUser');
+            window.location.href = 'index.html';
+        }
     </script>
 </body>
 </html>
