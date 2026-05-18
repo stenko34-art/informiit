@@ -75,7 +75,7 @@
             
             Promise.all([
                 fetch('https://docs.google.com/spreadsheets/d/' + sheetId + '/gviz/tq?tqx=out:json&sheet=ПЗ').then(function(r){return r.text();}),
-                fetch('https://script.google.com/macros/s/AKfycbzwO_i82RM5TunsRMw9flo0mvHxFVsNMbUiSlBhwzjmcInoJGOJKB3xgi4rfcIjkaV8/exec?id=1e4fcZ6J6fHfsvb6xca8lP5AwSRT2t7b02GcHEZfTmwU&sheet=%D0%9B%D0%A0' + sheetId + '&sheet=ЛР').then(function(r){return r.text();}),
+                fetch('https://script.google.com/macros/s/AKfycbzwO_i82RM5TunsRMw9flo0mvHxFVsNMbUiSlBhwzjmcInoJGOJKB3xgi4rfcIjkaV8/exec?id=' + sheetId + '&sheet=ЛР').then(function(r){return r.text();}),
                 fetch('https://docs.google.com/spreadsheets/d/' + sheetId + '/gviz/tq?tqx=out:json&sheet=Допуск').then(function(r){return r.text();})
             ]).then(function(results) {
                 var pz = parseSheet(results[0], 'ПЗ');
